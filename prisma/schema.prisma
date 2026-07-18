@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Grupo: Gestión de identidad
+// ============================================================
+
+model Rol {
+  idRol     Int       @id @default(autoincrement()) @map("id_rol")
+  nombre    String    @unique @db.VarChar(50)
+  permisos  String[]
+  usuarios  Usuario[]
+
+  @@map("rol")
+}
+
+model Usuario {
+  idUsuario           Int      @id @default(autoincrement()) @map("id_usuario")
+  nombre              String   @db.VarChar(120)
+  correo              String   @unique @db.VarChar(160)
+  contrasenaCifrada   String   @map("contrasena_cifrada") @db.VarChar(255)
+  fechaRegistro       DateTime @default(now()) @map("fecha_registro")
+  idRol               Int      @map("id_rol")
+
+  rol                 Rol                  @relation(fields: [idRol], references: [idRol], onDelete: Restrict)
+  sesiones            Sesion[]
+  servicios           Servicio[]
+  rutasAprendizaje    RutaAprendizaje[]
+  registrosDespliegue RegistroDespliegue[]
+  resultados          Resultado[]
+
+  @@index([correo])
+  @@map("usuario")
+}
+
+model Sesion {
+  idSesion         Int      @id @default(autoincrement()) @map("id_sesion")
+  token            String   @unique @db.VarChar(512)
+  fechaInicio      DateTime @default(now()) @map("fecha_inicio")
+  fechaExpiracion  DateTime @map("fecha_expiracion")
+  estado           String   @db.VarChar(20)
+  idUsuario        Int      @map("id_usuario")
+
+  usuario          Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@index([token])
+  @@index([idUsuario, estado])
+  @@map("sesion")
+}
+
+// ============================================================
+// Grupo: Gestión de servicios
+// ============================================================
+
+model Servicio {
+  idServicio      Int       @id @default(autoincrement()) @map("id_servicio")
+  nombre          String    @db.VarChar(120)
+  descripcion     String?   @db.Text
+  estado          String    @db.VarChar(20)
+  fechaCreacion   DateTime  @default(now()) @map("fecha_creacion")
+  idUsuario       Int       @map("id_usuario")
+
+  usuario              Usuario               @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  configuracion        ConfiguracionServicio?
+  registrosDespliegue  RegistroDespliegue[]
+  metricas             Metrica[]
+
+  @@unique([idUsuario, nombre])
+  @@index([estado])
+  @@map("servicio")
+}
+
+model ConfiguracionServicio {
+  idConfiguracion         Int      @id @default(autoincrement()) @map("id_configuracion")
+  imagenDocker            String   @map("imagen_docker") @db.VarChar(255)
+  cpuAsignado             Decimal  @map("cpu_asignado") @db.Decimal(4, 2)
+  memoriaAsignada         Int      @map("memoria_asignada")
+  almacenamientoAsignado  Int      @map("almacenamiento_asignado")
+  puertos                 Json
+  variablesEntorno        Json     @map("variables_entorno")
+  volumenes               Json
+  idServicio              Int      @unique @map("id_servicio")
+
+  servicio                Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+
+  @@map("configuracion_servicio")
+}
+
+model RegistroDespliegue {
+  idRegistro    Int      @id @default(autoincrement()) @map("id_registro")
+  fechaHora     DateTime @default(now()) @map("fecha_hora")
+  resultado     String   @db.VarChar(20)
+  mensajeError  String?  @map("mensaje_error") @db.Text
+  idServicio    Int      @map("id_servicio")
+  idUsuario     Int      @map("id_usuario")
+
+  servicio      Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+  usuario       Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idServicio, fechaHora])
+  @@map("registro_despliegue")
+}
+
+// ============================================================
+// Grupo: Monitoreo histórico
+// ============================================================
+
+model Metrica {
+  idMetrica         BigInt   @id @default(autoincrement()) @map("id_metrica")
+  consumoCpu        Decimal  @map("consumo_cpu") @db.Decimal(5, 2)
+  consumoMemoria    Int      @map("consumo_memoria")
+  estadoEjecucion   String   @map("estado_ejecucion") @db.VarChar(20)
+  marcaTiempo       DateTime @default(now()) @map("marca_tiempo")
+  idServicio        Int      @map("id_servicio")
+
+  servicio          Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+
+  @@index([idServicio, marcaTiempo])
+  @@map("metrica")
+}
+
+// ============================================================
+// Grupo: Componente educativo
+// ============================================================
+
+model RutaAprendizaje {
+  idRuta            Int       @id @default(autoincrement()) @map("id_ruta")
+  progreso          Decimal   @default(0) @db.Decimal(5, 2)
+  fechaAsignacion   DateTime  @default(now()) @map("fecha_asignacion")
+  idUsuario         Int       @map("id_usuario")
+
+  usuario           Usuario       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  rutaModulos       RutaModulo[]
+
+  @@map("ruta_aprendizaje")
+}
+
+model Modulo {
+  idModulo          Int       @id @default(autoincrement()) @map("id_modulo")
+  nombre            String    @db.VarChar(160)
+  contenidoTeorico  String    @map("contenido_teorico") @db.Text
+  orden             Int
+
+  rutaModulos       RutaModulo[]
+  actividades       Actividad[]
+  evaluacion        Evaluacion?
+
+  @@map("modulo")
+}
+
+model RutaModulo {
+  idRuta         Int   @map("id_ruta")
+  idModulo       Int   @map("id_modulo")
+  ordenSecuencia Int   @map("orden_secuencia")
+
+  ruta    RutaAprendizaje @relation(fields: [idRuta], references: [idRuta], onDelete: Cascade)
+  modulo  Modulo          @relation(fields: [idModulo], references: [idModulo], onDelete: Restrict)
+
+  @@id([idRuta, idModulo])
+  @@map("ruta_modulo")
+}
+
+model Actividad {
+  idActividad           Int      @id @default(autoincrement()) @map("id_actividad")
+  descripcion           String   @db.Text
+  criteriosValidacion   Json     @map("criterios_validacion")
+  orden                 Int
+  idModulo              Int      @map("id_modulo")
+
+  modulo                Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
+  resultados            Resultado[]
+
+  @@map("actividad")
+}
+
+model Evaluacion {
+  idEvaluacion      Int      @id @default(autoincrement()) @map("id_evaluacion")
+  titulo            String   @db.VarChar(200)
+  preguntas         Json
+  fechaDisponible   DateTime @map("fecha_disponible")
+  idModulo          Int      @unique @map("id_modulo")
+
+  modulo            Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
+  resultados        Resultado[]
+
+  @@map("evaluacion")
+}
+
+model Resultado {
+  idResultado         Int      @id @default(autoincrement()) @map("id_resultado")
+  puntuacion          Decimal  @db.Decimal(5, 2)
+  tiempoEmpleado      Int      @map("tiempo_empleado")
+  intentos            Int      @default(1)
+  fechaFinalizacion   DateTime @default(now()) @map("fecha_finalizacion")
+  idUsuario           Int      @map("id_usuario")
+  idEvaluacion        Int?     @map("id_evaluacion")
+  idActividad         Int?     @map("id_actividad")
+
+  usuario             Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  evaluacion          Evaluacion? @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: SetNull)
+  actividad           Actividad?  @relation(fields: [idActividad], references: [idActividad], onDelete: SetNull)
+
+  @@index([idUsuario, fechaFinalizacion])
+  @@map("resultado")
+}
