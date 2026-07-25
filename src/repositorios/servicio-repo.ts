@@ -100,6 +100,33 @@ export class ServicioRepo {
     return { cpu, memoria, almacenamiento };
   }
 
+  // Actualiza el estado del servicio conforme a la maquina de estados (seccion 4.2.14).
+  async actualizarEstado(
+    idServicio: number,
+    estado: string
+  ): Promise<Servicio> {
+    return this.prisma.servicio.update({
+      where: { idServicio },
+      data: { estado },
+    });
+  }
+
+  // RF-16: servicios no eliminados del usuario con su configuracion vigente, para el panel.
+  async listarActivosPorUsuario(
+    idUsuario: number
+  ): Promise<ServicioConConfiguraciones[]> {
+    return this.prisma.servicio.findMany({
+      where: { idUsuario, estado: { not: "eliminado" } },
+      include: {
+        configuraciones: {
+          orderBy: [{ fechaCreacion: "desc" }, { idConfiguracion: "desc" }],
+          take: 1,
+        },
+      },
+      orderBy: { idServicio: "asc" },
+    });
+  }
+
   // RF-08: registra una nueva version de configuracion para un servicio existente. No modifica
   // ni elimina las anteriores; la mas reciente pasa a ser la vigente.
   async agregarConfiguracion(

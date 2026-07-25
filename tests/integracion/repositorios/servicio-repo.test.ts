@@ -216,4 +216,68 @@ describe("ServicioRepo", () => {
       expect(total).toBe(2);
     });
   });
+
+  describe("actualizarEstado", () => {
+    it("cambia el estado del servicio", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const servicio = await repo.crearConConfiguracion({
+        idUsuario: usuario.idUsuario,
+        nombre: "svc",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const actualizado = await repo.actualizarEstado(
+        servicio.idServicio,
+        "en_ejecucion"
+      );
+
+      // Assert
+      expect(actualizado.estado).toBe("en_ejecucion");
+    });
+  });
+
+  describe("listarActivosPorUsuario", () => {
+    it("devuelve los servicios no eliminados del usuario con su configuracion vigente", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      await repo.crearConConfiguracion({
+        idUsuario: usuario.idUsuario,
+        nombre: "a",
+        configuracion: configValida(),
+      });
+      const b = await repo.crearConConfiguracion({
+        idUsuario: usuario.idUsuario,
+        nombre: "b",
+        configuracion: configValida(),
+      });
+      await repo.actualizarEstado(b.idServicio, "eliminado");
+
+      // Act
+      const activos = await repo.listarActivosPorUsuario(usuario.idUsuario);
+
+      // Assert
+      expect(activos).toHaveLength(1);
+      expect(activos[0]?.nombre).toBe("a");
+      expect(activos[0]?.configuraciones).toHaveLength(1);
+    });
+
+    it("no incluye servicios de otros usuarios", async () => {
+      // Arrange
+      const usuarioA = await crearUsuarioEnBd();
+      const usuarioB = await crearUsuarioEnBd();
+      await repo.crearConConfiguracion({
+        idUsuario: usuarioA.idUsuario,
+        nombre: "a",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const activosB = await repo.listarActivosPorUsuario(usuarioB.idUsuario);
+
+      // Assert
+      expect(activosB).toHaveLength(0);
+    });
+  });
 });
