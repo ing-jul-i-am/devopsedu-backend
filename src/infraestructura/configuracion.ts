@@ -5,14 +5,20 @@
 
 import { z } from "zod";
 
-// Esquema de las variables de entorno conocidas hasta la Etapa 0.
-// Se ampliara en etapas posteriores (JWT, PORT, etc.) a medida que se necesiten.
+// Esquema de las variables de entorno de la aplicacion. Se amplia por etapa a medida que
+// se necesitan nuevas variables.
 const esquemaConfiguracion = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
   DATABASE_URL: z.string().url(),
   DATABASE_URL_TEST: z.string().url().optional(),
+  // Autenticacion (Etapa 2). El secreto no tiene valor por defecto a proposito: un secreto
+  // debil o predecible comprometeria la firma de los tokens (RNF-10, RNF-14).
+  JWT_SECRET: z.string().min(16),
+  JWT_EXPIRACION_SEGUNDOS: z.coerce.number().int().positive().default(3600),
+  PORT: z.coerce.number().int().positive().default(3000),
+  ROL_POR_DEFECTO: z.string().min(1).default("estudiante"),
 });
 
 export type Configuracion = z.infer<typeof esquemaConfiguracion>;

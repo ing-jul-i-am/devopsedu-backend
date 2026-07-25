@@ -15,6 +15,7 @@ describe("cargarConfiguracion", () => {
     const entorno = {
       NODE_ENV: "test",
       DATABASE_URL: "postgresql://u:p@localhost:5432/db?schema=public",
+      JWT_SECRET: "una-clave-secreta-de-prueba-larga",
     };
 
     // Act
@@ -27,15 +28,31 @@ describe("cargarConfiguracion", () => {
     );
   });
 
-  it("usa 'development' como NODE_ENV por defecto cuando no se especifica", () => {
+  it("aplica los valores por defecto de NODE_ENV, puerto y rol", () => {
     // Arrange
-    const entorno = { DATABASE_URL: "postgresql://u:p@localhost:5432/db" };
+    const entorno = {
+      DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+      JWT_SECRET: "una-clave-secreta-de-prueba-larga",
+    };
 
     // Act
     const config = cargarConfiguracion(entorno);
 
     // Assert
     expect(config.NODE_ENV).toBe("development");
+    expect(config.PORT).toBe(3000);
+    expect(config.ROL_POR_DEFECTO).toBe("estudiante");
+  });
+
+  it("lanza ConfiguracionInvalidaError cuando falta JWT_SECRET", () => {
+    // Arrange
+    const entorno = { DATABASE_URL: "postgresql://u:p@localhost:5432/db" };
+
+    // Act
+    const intento = () => cargarConfiguracion(entorno);
+
+    // Assert
+    expect(intento).toThrow(ConfiguracionInvalidaError);
   });
 
   it("lanza ConfiguracionInvalidaError cuando falta DATABASE_URL", () => {

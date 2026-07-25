@@ -21,5 +21,17 @@ export default tseslint.config(
       ecmaVersion: 2022,
       sourceType: "module",
     },
+    rules: {
+      // Permite parametros/variables intencionalmente sin usar cuando llevan prefijo "_"
+      // (p. ej. el 4o parametro obligatorio de los manejadores de error de Express).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
   }
 );
