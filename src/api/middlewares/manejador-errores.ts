@@ -6,6 +6,7 @@ import type { ErrorRequestHandler } from "express";
 import { CredencialesInvalidasError } from "../../dominio/errores/credenciales-invalidas-error.js";
 import { CorreoYaRegistradoError } from "../../dominio/errores/correo-ya-registrado-error.js";
 import { TokenInvalidoError } from "../../dominio/errores/token-invalido-error.js";
+import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-error.js";
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
@@ -19,6 +20,12 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof TokenInvalidoError) {
     logger.warn({ evento: "token_invalido", ruta: req.path });
     res.status(401).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof PermisoDenegadoError) {
+    logger.warn({ evento: "acceso_no_autorizado", ruta: req.path });
+    res.status(403).json({ error: err.message });
     return;
   }
 

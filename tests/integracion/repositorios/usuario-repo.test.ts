@@ -100,4 +100,27 @@ describe("UsuarioRepo", () => {
       expect(encontrado).toBeNull();
     });
   });
+
+  describe("buscarPorIdConRol", () => {
+    it("devuelve el usuario junto con su rol", async () => {
+      // Arrange
+      const rol = await crearRolEnBd({ nombre: "estudiante" });
+      const creado = await crearUsuarioEnBd({ idRol: rol.idRol });
+
+      // Act
+      const encontrado = await repo.buscarPorIdConRol(creado.idUsuario);
+
+      // Assert
+      expect(encontrado?.idUsuario).toBe(creado.idUsuario);
+      expect(encontrado?.rol.nombre).toBe("estudiante");
+    });
+
+    it("devuelve null cuando el id no existe", async () => {
+      // Act
+      const encontrado = await repo.buscarPorIdConRol(999_999);
+
+      // Assert
+      expect(encontrado).toBeNull();
+    });
+  });
 });

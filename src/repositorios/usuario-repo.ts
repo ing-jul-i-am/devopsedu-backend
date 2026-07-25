@@ -3,7 +3,7 @@
 // que conoce el detalle de persistencia de usuarios (CLAUDE.md 3, capa de acceso a datos).
 // Cubre: RF-01, RF-04
 
-import type { PrismaClient, Usuario } from "@prisma/client";
+import type { PrismaClient, Usuario, Rol } from "@prisma/client";
 
 export interface DatosNuevoUsuario {
   nombre: string;
@@ -25,5 +25,16 @@ export class UsuarioRepo {
 
   async buscarPorId(idUsuario: number): Promise<Usuario | null> {
     return this.prisma.usuario.findUnique({ where: { idUsuario } });
+  }
+
+  // Incluye el rol para que el middleware de autenticacion pueda autorizar por rol sin una
+  // consulta adicional.
+  async buscarPorIdConRol(
+    idUsuario: number
+  ): Promise<(Usuario & { rol: Rol }) | null> {
+    return this.prisma.usuario.findUnique({
+      where: { idUsuario },
+      include: { rol: true },
+    });
   }
 }
