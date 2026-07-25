@@ -14,6 +14,19 @@ export interface ParcialesUsuario {
   idRol?: number;
 }
 
+// Factory pura en memoria (sin base de datos), para las pruebas unitarias (CLAUDE.md 7.5).
+export function crearUsuario(parciales: Partial<Usuario> = {}): Usuario {
+  return {
+    idUsuario: 1,
+    nombre: "Estudiante de prueba",
+    correo: "estudiante@devopsedu.local",
+    contrasenaCifrada: "hash_falso",
+    fechaRegistro: new Date("2026-01-01"),
+    idRol: 1,
+    ...parciales,
+  };
+}
+
 // Contador para generar correos unicos por defecto y no chocar con la restriccion @unique
 // cuando un mismo test crea varios usuarios sin especificar el correo.
 let secuenciaUsuario = 0;
