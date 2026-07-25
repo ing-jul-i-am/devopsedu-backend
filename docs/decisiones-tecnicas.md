@@ -97,3 +97,40 @@ la prueba de aceptacion end-to-end de RF-04 se redacta al construir los endpoint
 **Alternativas consideradas:**
 - Crear `GET /api/usuarios/yo` o `GET /api/usuarios`. Descartadas por no ser requeridas por
   RF-04 ni por ningun otro RF del catalogo en esta etapa (evita alcance especulativo).
+
+---
+
+## DT-04: ConfiguracionServicio pasa a 1:N (historico de configuraciones) para cumplir RF-08
+
+**Fecha:** 2026-07-25
+
+**Contexto:** El documento de diseño es internamente inconsistente sobre la cardinalidad entre
+`Servicio` y `ConfiguracionServicio`:
+
+- RF-08 ("Edicion de configuracion de servicio") exige modificar la configuracion "generando un
+  nuevo registro de configuracion asociado al mismo servicio", y su criterio de aceptacion pide
+  que la modificacion "quede registrada en el historico de configuraciones". Esto implica 1:N.
+- El modelo de clases (seccion 4.2.16) menciona "sus ConfiguracionServicio ... asociadas" en
+  plural y como composicion, lo que tambien sugiere 1:N.
+- El diagrama entidad-relacion (seccion 4.2.17) declara la relacion como 1:1 mediante un UNIQUE
+  sobre `id_servicio`, "cada servicio mantenga exactamente una configuracion vigente".
+
+El esquema Prisma inicial seguia el ER (1:1), lo que hace imposible cumplir el criterio de
+aceptacion de RF-08.
+
+**Decision:** Con aprobacion del autor del proyecto, se adopta el modelo 1:N para cumplir RF-08:
+
+- Se elimina el UNIQUE sobre `id_servicio` en `configuracion_servicio`.
+- Se agrega `fecha_creacion` a `configuracion_servicio` y un indice `(id_servicio, fecha_creacion)`.
+- La configuracion vigente de un servicio es la mas reciente (desempate por `id_configuracion`).
+- Editar la configuracion (RF-08) inserta un nuevo registro; no actualiza el existente.
+
+Migracion: `20260725080415_agrega_historico_configuracion_servicio`.
+
+**Consecuencias:** Se cumple RF-08 y el modelo de clases (plural). Se aparta del ER 1:1 del
+documento; el diagrama ER debe actualizarse a 1:N en la proxima revision del diseño para
+mantener la coherencia documental.
+
+**Alternativas consideradas:**
+- Mantener 1:1 y editar en sitio. Descartada porque incumple el criterio de aceptacion de RF-08
+  (no habria historico de configuraciones).
