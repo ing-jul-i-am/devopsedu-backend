@@ -19,6 +19,13 @@ const esquemaConfiguracion = z.object({
   JWT_EXPIRACION_SEGUNDOS: z.coerce.number().int().positive().default(3600),
   PORT: z.coerce.number().int().positive().default(3000),
   ROL_POR_DEFECTO: z.string().min(1).default("estudiante"),
+  // Capacidad de almacenamiento del servidor en MB (RF-09/RF-10). El sistema operativo no
+  // expone el disco de forma portable, por lo que se declara explicitamente.
+  SERVIDOR_ALMACENAMIENTO_TOTAL_MB: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(20480),
 });
 
 export type Configuracion = z.infer<typeof esquemaConfiguracion>;
