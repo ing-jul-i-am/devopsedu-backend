@@ -17,6 +17,34 @@ const volumenSchema = z.object({
   modo: z.enum(["ro", "rw"]),
 });
 
+// Esquema de la configuracion tecnica de un servicio. Reutilizado por la creacion (RF-05) y la
+// edicion de configuracion (RF-08).
+export const configuracionSchema = z.object({
+  imagenDocker: z
+    .string()
+    .min(1, { message: "La imagen Docker es obligatoria" })
+    .max(255),
+  cpuAsignado: z
+    .number({ message: "El CPU asignado debe ser un numero" })
+    .positive({ message: "El CPU asignado debe ser mayor que cero" })
+    .max(8, { message: "El CPU asignado no puede exceder 8 nucleos" }),
+  memoriaAsignada: z
+    .number()
+    .int({ message: "La memoria asignada debe ser un entero (MB)" })
+    .positive({ message: "La memoria asignada debe ser mayor que cero" })
+    .max(131072, { message: "La memoria asignada no puede exceder 131072 MB" }),
+  almacenamientoAsignado: z
+    .number()
+    .int({ message: "El almacenamiento asignado debe ser un entero (MB)" })
+    .positive({ message: "El almacenamiento asignado debe ser mayor que cero" })
+    .max(1048576, {
+      message: "El almacenamiento asignado no puede exceder 1048576 MB",
+    }),
+  puertos: z.array(puertoSchema),
+  variablesEntorno: z.record(z.string(), z.string()),
+  volumenes: z.array(volumenSchema),
+});
+
 export const crearServicioSchema = z.object({
   nombre: z
     .string()
@@ -26,31 +54,7 @@ export const crearServicioSchema = z.object({
     .string()
     .max(500, { message: "La descripcion no puede exceder 500 caracteres" })
     .optional(),
-  configuracion: z.object({
-    imagenDocker: z
-      .string()
-      .min(1, { message: "La imagen Docker es obligatoria" })
-      .max(255),
-    cpuAsignado: z
-      .number({ message: "El CPU asignado debe ser un numero" })
-      .positive({ message: "El CPU asignado debe ser mayor que cero" })
-      .max(8, { message: "El CPU asignado no puede exceder 8 nucleos" }),
-    memoriaAsignada: z
-      .number()
-      .int({ message: "La memoria asignada debe ser un entero (MB)" })
-      .positive({ message: "La memoria asignada debe ser mayor que cero" })
-      .max(131072, { message: "La memoria asignada no puede exceder 131072 MB" }),
-    almacenamientoAsignado: z
-      .number()
-      .int({ message: "El almacenamiento asignado debe ser un entero (MB)" })
-      .positive({ message: "El almacenamiento asignado debe ser mayor que cero" })
-      .max(1048576, {
-        message: "El almacenamiento asignado no puede exceder 1048576 MB",
-      }),
-    puertos: z.array(puertoSchema),
-    variablesEntorno: z.record(z.string(), z.string()),
-    volumenes: z.array(volumenSchema),
-  }),
+  configuracion: configuracionSchema,
 });
 
 export type CrearServicioDTO = z.infer<typeof crearServicioSchema>;

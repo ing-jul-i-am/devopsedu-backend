@@ -100,6 +100,17 @@ export class ServicioRepo {
     return { cpu, memoria, almacenamiento };
   }
 
+  // RF-08: registra una nueva version de configuracion para un servicio existente. No modifica
+  // ni elimina las anteriores; la mas reciente pasa a ser la vigente.
+  async agregarConfiguracion(
+    idServicio: number,
+    configuracion: DatosConfiguracion
+  ): Promise<ConfiguracionServicio> {
+    return this.prisma.configuracionServicio.create({
+      data: { ...this.aDatosPersistencia(configuracion), idServicio },
+    });
+  }
+
   private aDatosPersistencia(
     c: DatosConfiguracion
   ): Prisma.ConfiguracionServicioCreateWithoutServicioInput {

@@ -9,6 +9,7 @@ import { crearControladoresServicios } from "../controladores/servicios/servicio
 import { validar } from "../middlewares/validar.js";
 import { autorizar } from "../middlewares/autorizar.js";
 import { crearServicioSchema } from "../validadores/servicios/crear-servicio.validador.js";
+import { editarConfiguracionSchema } from "../validadores/servicios/editar-configuracion.validador.js";
 
 export function crearRutasServicios(
   gestor: GestorServicios,
@@ -23,6 +24,14 @@ export function crearRutasServicios(
     autorizar("estudiante", "docente"),
     validar(crearServicioSchema),
     controladores.crear
+  );
+
+  router.put(
+    "/:idServicio/configuracion",
+    autenticar,
+    autorizar("estudiante", "docente"),
+    validar(editarConfiguracionSchema),
+    controladores.editarConfiguracion
   );
 
   return router;

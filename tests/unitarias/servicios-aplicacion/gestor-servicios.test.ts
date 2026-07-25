@@ -5,10 +5,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { GestorServicios } from "@/servicios-aplicacion/gestor-servicios.js";
 import { RecursosInsuficientesError } from "@/dominio/errores/recursos-insuficientes-error.js";
+import { ServicioNoEncontradoError } from "@/dominio/errores/servicio-no-encontrado-error.js";
 
 function crearDeps() {
   return {
-    servicioRepo: { crearConConfiguracion: vi.fn() },
+    servicioRepo: {
+      crearConConfiguracion: vi.fn(),
+      buscarPorIdConConfiguracionVigente: vi.fn(),
+      agregarConfiguracion: vi.fn(),
+    },
     verificador: { verificarDisponibilidad: vi.fn() },
   };
 }
@@ -75,5 +80,60 @@ describe("GestorServicios.crearServicio", () => {
     // Assert
     await expect(intento).rejects.toBeInstanceOf(RecursosInsuficientesError);
     expect(dep.servicioRepo.crearConConfiguracion).not.toHaveBeenCalled();
+  });
+});
+
+describe("GestorServicios.editarConfiguracion", () => {
+  it("agrega una nueva version de configuracion cuando el servicio es del usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 7,
+      configuraciones: [],
+    });
+    dep.servicioRepo.agregarConfiguracion.mockResolvedValue({});
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    await gestor.editarConfiguracion(7, 1, dtoValido().configuracion);
+
+    // Assert
+    expect(dep.servicioRepo.agregarConfiguracion).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ memoriaAsignada: 512 })
+    );
+  });
+
+  it("lanza ServicioNoEncontradoError cuando el servicio no existe", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(null);
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const intento = gestor.editarConfiguracion(7, 1, dtoValido().configuracion);
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
+    expect(dep.servicioRepo.agregarConfiguracion).not.toHaveBeenCalled();
+  });
+
+  it("lanza ServicioNoEncontradoError cuando el servicio pertenece a otro usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 99,
+      configuraciones: [],
+    });
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const intento = gestor.editarConfiguracion(7, 1, dtoValido().configuracion);
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
+    expect(dep.servicioRepo.agregarConfiguracion).not.toHaveBeenCalled();
   });
 });

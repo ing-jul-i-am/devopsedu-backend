@@ -7,6 +7,7 @@ import type { RequestHandler } from "express";
 import type { GestorServicios } from "../../../servicios-aplicacion/gestor-servicios.js";
 import type { ServicioConConfiguraciones } from "../../../repositorios/servicio-repo.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
+import { ServicioNoEncontradoError } from "../../../dominio/errores/servicio-no-encontrado-error.js";
 
 function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
   const vigente = servicio.configuraciones[0];
@@ -32,6 +33,7 @@ function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
 
 export function crearControladoresServicios(gestor: GestorServicios): {
   crear: RequestHandler;
+  editarConfiguracion: RequestHandler;
 } {
   const crear: RequestHandler = async (req, res, next) => {
     try {
@@ -46,5 +48,26 @@ export function crearControladoresServicios(gestor: GestorServicios): {
     }
   };
 
-  return { crear };
+  const editarConfiguracion: RequestHandler = async (req, res, next) => {
+    try {
+      const usuario = req.usuario;
+      if (!usuario) {
+        throw new TokenInvalidoError();
+      }
+      const idServicio = Number(req.params["idServicio"]);
+      if (!Number.isInteger(idServicio)) {
+        throw new ServicioNoEncontradoError();
+      }
+      const servicio = await gestor.editarConfiguracion(
+        usuario.idUsuario,
+        idServicio,
+        req.body.configuracion
+      );
+      res.status(200).json(aServicioRespuesta(servicio));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  return { crear, editarConfiguracion };
 }

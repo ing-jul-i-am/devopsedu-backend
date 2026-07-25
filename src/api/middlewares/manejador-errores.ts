@@ -9,6 +9,7 @@ import { TokenInvalidoError } from "../../dominio/errores/token-invalido-error.j
 import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-error.js";
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
 import { RecursosInsuficientesError } from "../../dominio/errores/recursos-insuficientes-error.js";
+import { ServicioNoEncontradoError } from "../../dominio/errores/servicio-no-encontrado-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
 export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
@@ -27,6 +28,11 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof PermisoDenegadoError) {
     logger.warn({ evento: "acceso_no_autorizado", ruta: req.path });
     res.status(403).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ServicioNoEncontradoError) {
+    res.status(404).json({ error: err.message });
     return;
   }
 

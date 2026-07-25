@@ -188,4 +188,32 @@ describe("ServicioRepo", () => {
       expect(suma.memoria).toBe(4096);
     });
   });
+
+  describe("agregarConfiguracion", () => {
+    it("inserta una nueva version de configuracion (historico) para el servicio", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const servicio = await repo.crearConConfiguracion({
+        idUsuario: usuario.idUsuario,
+        nombre: "svc",
+        configuracion: configValida(),
+      });
+
+      // Act
+      await repo.agregarConfiguracion(servicio.idServicio, {
+        ...configValida(),
+        memoriaAsignada: 2048,
+      });
+
+      // Assert
+      const vigente = await repo.buscarPorIdConConfiguracionVigente(
+        servicio.idServicio
+      );
+      expect(vigente?.configuraciones[0]?.memoriaAsignada).toBe(2048);
+      const total = await prismaTest.configuracionServicio.count({
+        where: { idServicio: servicio.idServicio },
+      });
+      expect(total).toBe(2);
+    });
+  });
 });

@@ -10,6 +10,7 @@ import type {
 } from "../repositorios/servicio-repo.js";
 import type { VerificadorRecursos } from "./verificador-recursos.js";
 import { RecursosInsuficientesError } from "../dominio/errores/recursos-insuficientes-error.js";
+import { ServicioNoEncontradoError } from "../dominio/errores/servicio-no-encontrado-error.js";
 
 export interface DatosCrearServicio {
   nombre: string;
@@ -18,7 +19,12 @@ export interface DatosCrearServicio {
 }
 
 export interface DependenciasGestorServicios {
-  servicioRepo: Pick<ServicioRepo, "crearConConfiguracion">;
+  servicioRepo: Pick<
+    ServicioRepo,
+    | "crearConConfiguracion"
+    | "buscarPorIdConConfiguracionVigente"
+    | "agregarConfiguracion"
+  >;
   verificador: Pick<VerificadorRecursos, "verificarDisponibilidad">;
 }
 
@@ -51,5 +57,28 @@ export class GestorServicios {
       ...(dto.descripcion !== undefined ? { descripcion: dto.descripcion } : {}),
       configuracion: config,
     });
+  }
+
+  // RF-08: registra una nueva version de configuracion para un servicio propio del usuario. La
+  // verificacion de recursos no se aplica aqui, sino en el despliegue (RF-09/RF-11).
+  async editarConfiguracion(
+    idUsuario: number,
+    idServicio: number,
+    configuracion: DatosConfiguracion
+  ): Promise<ServicioConConfiguraciones> {
+    const servicio =
+      await this.dep.servicioRepo.buscarPorIdConConfiguracionVigente(idServicio);
+    if (!servicio || servicio.idUsuario !== idUsuario) {
+      throw new ServicioNoEncontradoError();
+    }
+
+    await this.dep.servicioRepo.agregarConfiguracion(idServicio, configuracion);
+
+    const actualizado =
+      await this.dep.servicioRepo.buscarPorIdConConfiguracionVigente(idServicio);
+    if (!actualizado) {
+      throw new ServicioNoEncontradoError();
+    }
+    return actualizado;
   }
 }
