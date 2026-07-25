@@ -6,13 +6,16 @@
 import express, { type Express, type RequestHandler } from "express";
 import type { Autenticador } from "../servicios-aplicacion/autenticador.js";
 import type { GestorServicios } from "../servicios-aplicacion/gestor-servicios.js";
+import type { VerificadorRecursos } from "../servicios-aplicacion/verificador-recursos.js";
 import { crearRutasAuth } from "./rutas/auth.rutas.js";
 import { crearRutasServicios } from "./rutas/servicios.rutas.js";
+import { crearRutasServidor } from "./rutas/servidor.rutas.js";
 import { manejadorErrores } from "./middlewares/manejador-errores.js";
 
 export interface DependenciasApp {
   autenticador: Autenticador;
   gestorServicios: GestorServicios;
+  verificador: VerificadorRecursos;
   autenticar: RequestHandler;
 }
 
@@ -25,6 +28,10 @@ export function crearApp(dependencias: DependenciasApp): Express {
   app.use(
     "/api/servicios",
     crearRutasServicios(dependencias.gestorServicios, dependencias.autenticar)
+  );
+  app.use(
+    "/api/servidor",
+    crearRutasServidor(dependencias.verificador, dependencias.autenticar)
   );
 
   // El manejador de errores se registra al final, tras todas las rutas.

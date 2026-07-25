@@ -57,5 +57,5 @@ export function construirDependencias(
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
 
-  return { autenticador, gestorServicios, autenticar };
+  return { autenticador, gestorServicios, verificador, autenticar };
 }
