@@ -9,6 +9,7 @@ import { SesionRepo } from "./repositorios/sesion-repo.js";
 import { RolRepo } from "./repositorios/rol-repo.js";
 import { ServicioRepo } from "./repositorios/servicio-repo.js";
 import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.js";
+import { MetricaRepo } from "./repositorios/metrica-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import { crearLectorCapacidad } from "./infraestructura/capacidad-servidor.js";
@@ -35,6 +36,7 @@ export function construirDependencias(
   const rolRepo = new RolRepo(prisma);
   const servicioRepo = new ServicioRepo(prisma);
   const registroRepo = new RegistroDespliegueRepo(prisma);
+  const metricaRepo = new MetricaRepo(prisma);
 
   const cifrador = new Cifrador();
   const emisor = new EmisorToken({
@@ -59,6 +61,7 @@ export function construirDependencias(
   const gestorServicios = new GestorServicios({
     servicioRepo,
     registroRepo,
+    metricaRepo,
     verificador,
   });
   const gestorDocker = new GestorDocker({

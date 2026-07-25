@@ -16,6 +16,7 @@ function crearDeps() {
       listarActivosPorUsuario: vi.fn(),
     },
     registroRepo: { listarPorServicio: vi.fn() },
+    metricaRepo: { listarPorServicio: vi.fn() },
     verificador: { verificarDisponibilidad: vi.fn() },
   };
 }
@@ -197,5 +198,44 @@ describe("GestorServicios.obtenerDetalle", () => {
     // Assert
     await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
     expect(dep.registroRepo.listarPorServicio).not.toHaveBeenCalled();
+  });
+});
+
+describe("GestorServicios.obtenerMetricas", () => {
+  it("devuelve las metricas cuando el servicio pertenece al usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 7,
+      configuraciones: [],
+    });
+    dep.metricaRepo.listarPorServicio.mockResolvedValue([{ consumoCpu: 10 }]);
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const metricas = await gestor.obtenerMetricas(7, 1, {});
+
+    // Assert
+    expect(dep.metricaRepo.listarPorServicio).toHaveBeenCalledWith(1, {});
+    expect(metricas).toHaveLength(1);
+  });
+
+  it("lanza ServicioNoEncontradoError cuando el servicio es de otro usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 99,
+      configuraciones: [],
+    });
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const intento = gestor.obtenerMetricas(7, 1, {});
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
+    expect(dep.metricaRepo.listarPorServicio).not.toHaveBeenCalled();
   });
 });

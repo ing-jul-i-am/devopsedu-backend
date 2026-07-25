@@ -33,6 +33,9 @@ export function crearRutasServicios(
   // RF-17: detalle del servicio con su historico.
   router.get("/:idServicio", autenticar, rol, c.detalle);
 
+  // RF-18: historico de metricas de consumo del servicio.
+  router.get("/:idServicio/metricas", autenticar, rol, c.metricas);
+
   // RF-08: edicion de la configuracion.
   router.put(
     "/:idServicio/configuracion",

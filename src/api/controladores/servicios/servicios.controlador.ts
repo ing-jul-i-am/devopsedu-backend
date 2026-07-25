@@ -5,7 +5,7 @@
 // Cubre: RF-05, RF-06, RF-07, RF-11, RF-12, RF-13, RF-14, RF-16, RF-17 — CU-03, CU-05
 
 import type { RequestHandler, Request } from "express";
-import type { Servicio } from "@prisma/client";
+import type { Servicio, Metrica } from "@prisma/client";
 import type { GestorServicios } from "../../../servicios-aplicacion/gestor-servicios.js";
 import type { GestorDocker } from "../../../servicios-aplicacion/gestor-docker.js";
 import type { ServicioConConfiguraciones } from "../../../repositorios/servicio-repo.js";
@@ -13,6 +13,7 @@ import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ServicioNoEncontradoError } from "../../../dominio/errores/servicio-no-encontrado-error.js";
 import { CATALOGO_IMAGENES } from "../../../dominio/catalogo-imagenes.js";
+import { metricasQuerySchema } from "../../validadores/servicios/metricas.validador.js";
 
 function usuarioDe(req: Request): UsuarioAutenticado {
   if (!req.usuario) {
@@ -59,6 +60,18 @@ function aServicioBasico(servicio: Servicio) {
   };
 }
 
+// idMetrica es BigInt y consumoCpu es Decimal: se convierten a number para poder serializar a
+// JSON (JSON.stringify no admite BigInt).
+function aMetricaRespuesta(metrica: Metrica) {
+  return {
+    idMetrica: Number(metrica.idMetrica),
+    consumoCpu: Number(metrica.consumoCpu),
+    consumoMemoria: metrica.consumoMemoria,
+    estadoEjecucion: metrica.estadoEjecucion,
+    marcaTiempo: metrica.marcaTiempo,
+  };
+}
+
 export function crearControladoresServicios(
   gestorServicios: GestorServicios,
   gestorDocker: GestorDocker
@@ -68,6 +81,7 @@ export function crearControladoresServicios(
   listarImagenes: RequestHandler;
   listar: RequestHandler;
   detalle: RequestHandler;
+  metricas: RequestHandler;
   desplegar: RequestHandler;
   detener: RequestHandler;
   reiniciar: RequestHandler;
@@ -129,6 +143,29 @@ export function crearControladoresServicios(
     }
   };
 
+  const metricas: RequestHandler = async (req, res, next) => {
+    try {
+      const usuario = usuarioDe(req);
+      const idServicio = idServicioDe(req);
+      const query = metricasQuerySchema.safeParse(req.query);
+      if (!query.success) {
+        res.status(400).json({ error: "Parametros de consulta invalidos" });
+        return;
+      }
+      const resultado = await gestorServicios.obtenerMetricas(
+        usuario.idUsuario,
+        idServicio,
+        {
+          ...(query.data.desde ? { desde: query.data.desde } : {}),
+          ...(query.data.hasta ? { hasta: query.data.hasta } : {}),
+        }
+      );
+      res.status(200).json(resultado.map(aMetricaRespuesta));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   const operacion = (
     accion: (idUsuario: number, idServicio: number) => Promise<Servicio>
   ): RequestHandler => {
@@ -150,6 +187,7 @@ export function crearControladoresServicios(
     listarImagenes,
     listar,
     detalle,
+    metricas,
     desplegar: operacion((u, s) => gestorDocker.desplegar(u, s)),
     detener: operacion((u, s) => gestorDocker.detener(u, s)),
     reiniciar: operacion((u, s) => gestorDocker.reiniciar(u, s)),
