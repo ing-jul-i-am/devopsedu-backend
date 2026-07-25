@@ -65,3 +65,35 @@ correcta. Los tests se siguen verificando con tipos mediante `tsconfig.json`.
   pruebas fuera de la verificacion de tipos de `tsc`.
 - Mover las pruebas dentro de `src`. Descartada por contradecir la estructura de carpetas del
   `CLAUDE.md` seccion 4.
+
+---
+
+## DT-03: RF-04 es un requerimiento transversal de autorizacion, no un endpoint de /api/usuarios
+
+**Fecha:** 2026-07-25
+
+**Contexto:** La tabla de la seccion 8 del `CLAUDE.md` agrupa RF-04 bajo el recurso
+`/api/usuarios`. Sin embargo, el texto del catalogo (seccion 4.2.6.1.1 del diseño) define
+RF-04 como "Gestion de perfiles diferenciados": el sistema debe diferenciar las
+funcionalidades segun el rol, restringiendo las operaciones administrativas al perfil docente,
+y registrar en la bitacora los intentos denegados. Su criterio de aceptacion se refiere a que
+un estudiante no pueda crear ni modificar modulos educativos.
+
+**Decision:** RF-04 no se implementa como un recurso REST propio (`/api/usuarios`). Se
+satisface con el mecanismo de autorizacion transversal:
+
+- Middleware `autenticar` (valida el JWT y la vigencia de la sesion).
+- Middleware `autorizar(...roles)` (restringe por rol y registra el acceso no autorizado).
+- Traduccion de `PermisoDenegadoError` a HTTP 403 con registro en bitacora (RNF-14).
+
+El punto de aplicacion concreto del criterio de aceptacion (bloquear al estudiante en la
+creacion/modificacion de modulos) y su verificacion de integracion viven en la Etapa 6
+(`/api/modulos`), donde esas rutas se protegen con `autorizar("docente")`.
+
+**Consecuencias:** No se agrega un endpoint `/api/usuarios` especulativo. La Etapa 2 queda
+completa en cuanto al mecanismo (RF-01, RF-02, RF-03, RF-04, RNF-10, RNF-12, RNF-14, RNF-21);
+la prueba de aceptacion end-to-end de RF-04 se redacta al construir los endpoints de modulos.
+
+**Alternativas consideradas:**
+- Crear `GET /api/usuarios/yo` o `GET /api/usuarios`. Descartadas por no ser requeridas por
+  RF-04 ni por ningun otro RF del catalogo en esta etapa (evita alcance especulativo).
