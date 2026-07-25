@@ -10,6 +10,11 @@ import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-err
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
 import { RecursosInsuficientesError } from "../../dominio/errores/recursos-insuficientes-error.js";
 import { ServicioNoEncontradoError } from "../../dominio/errores/servicio-no-encontrado-error.js";
+import { TransicionInvalidaError } from "../../dominio/errores/transicion-invalida-error.js";
+import { ImagenDockerNoDisponibleError } from "../../dominio/errores/imagen-docker-no-disponible-error.js";
+import { NombreContenedorEnUsoError } from "../../dominio/errores/nombre-contenedor-en-uso-error.js";
+import { ContenedorNoEncontradoError } from "../../dominio/errores/contenedor-no-encontrado-error.js";
+import { MotorDockerNoDisponibleError } from "../../dominio/errores/motor-docker-no-disponible-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
 export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
@@ -48,6 +53,30 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
       solicitado: err.solicitado,
       disponible: err.disponible,
     });
+    return;
+  }
+
+  if (err instanceof ImagenDockerNoDisponibleError) {
+    res.status(422).json({ error: err.message });
+    return;
+  }
+
+  if (
+    err instanceof TransicionInvalidaError ||
+    err instanceof NombreContenedorEnUsoError
+  ) {
+    res.status(409).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ContenedorNoEncontradoError) {
+    res.status(404).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof MotorDockerNoDisponibleError) {
+    logger.error({ evento: "motor_docker_no_disponible" });
+    res.status(503).json({ error: err.message });
     return;
   }
 

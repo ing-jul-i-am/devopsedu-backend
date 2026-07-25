@@ -8,12 +8,14 @@ import { UsuarioRepo } from "./repositorios/usuario-repo.js";
 import { SesionRepo } from "./repositorios/sesion-repo.js";
 import { RolRepo } from "./repositorios/rol-repo.js";
 import { ServicioRepo } from "./repositorios/servicio-repo.js";
+import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import { crearLectorCapacidad } from "./infraestructura/capacidad-servidor.js";
 import { Autenticador } from "./servicios-aplicacion/autenticador.js";
 import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos.js";
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
+import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import type { DependenciasApp } from "./api/app.js";
 
@@ -32,6 +34,7 @@ export function construirDependencias(
   const sesionRepo = new SesionRepo(prisma);
   const rolRepo = new RolRepo(prisma);
   const servicioRepo = new ServicioRepo(prisma);
+  const registroRepo = new RegistroDespliegueRepo(prisma);
 
   const cifrador = new Cifrador();
   const emisor = new EmisorToken({
@@ -53,9 +56,24 @@ export function construirDependencias(
     servicioRepo,
     capacidadTotal: crearLectorCapacidad(config.almacenamientoTotalMb),
   });
-  const gestorServicios = new GestorServicios({ servicioRepo, verificador });
+  const gestorServicios = new GestorServicios({
+    servicioRepo,
+    registroRepo,
+    verificador,
+  });
+  const gestorDocker = new GestorDocker({
+    servicioRepo,
+    registroRepo,
+    verificador,
+  });
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
 
-  return { autenticador, gestorServicios, verificador, autenticar };
+  return {
+    autenticador,
+    gestorServicios,
+    gestorDocker,
+    verificador,
+    autenticar,
+  };
 }

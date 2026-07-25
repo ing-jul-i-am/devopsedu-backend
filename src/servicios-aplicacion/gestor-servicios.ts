@@ -3,11 +3,13 @@
 // creacion: verifica la disponibilidad de recursos antes de persistir la configuracion.
 // Cubre: RF-05, RF-09 — CU-03, CU-04
 
+import type { RegistroDespliegue } from "@prisma/client";
 import type {
   ServicioRepo,
   DatosConfiguracion,
   ServicioConConfiguraciones,
 } from "../repositorios/servicio-repo.js";
+import type { RegistroDespliegueRepo } from "../repositorios/registro-despliegue-repo.js";
 import type { VerificadorRecursos } from "./verificador-recursos.js";
 import { RecursosInsuficientesError } from "../dominio/errores/recursos-insuficientes-error.js";
 import { ServicioNoEncontradoError } from "../dominio/errores/servicio-no-encontrado-error.js";
@@ -18,13 +20,20 @@ export interface DatosCrearServicio {
   configuracion: DatosConfiguracion;
 }
 
+export interface DetalleServicio {
+  servicio: ServicioConConfiguraciones;
+  registros: RegistroDespliegue[];
+}
+
 export interface DependenciasGestorServicios {
   servicioRepo: Pick<
     ServicioRepo,
     | "crearConConfiguracion"
     | "buscarPorIdConConfiguracionVigente"
     | "agregarConfiguracion"
+    | "listarActivosPorUsuario"
   >;
+  registroRepo: Pick<RegistroDespliegueRepo, "listarPorServicio">;
   verificador: Pick<VerificadorRecursos, "verificarDisponibilidad">;
 }
 
@@ -80,5 +89,24 @@ export class GestorServicios {
       throw new ServicioNoEncontradoError();
     }
     return actualizado;
+  }
+
+  // RF-16: panel de servicios activos del usuario.
+  async listarPanel(idUsuario: number): Promise<ServicioConConfiguraciones[]> {
+    return this.dep.servicioRepo.listarActivosPorUsuario(idUsuario);
+  }
+
+  // RF-17: detalle del servicio con su configuracion vigente y su historico de operaciones.
+  async obtenerDetalle(
+    idUsuario: number,
+    idServicio: number
+  ): Promise<DetalleServicio> {
+    const servicio =
+      await this.dep.servicioRepo.buscarPorIdConConfiguracionVigente(idServicio);
+    if (!servicio || servicio.idUsuario !== idUsuario) {
+      throw new ServicioNoEncontradoError();
+    }
+    const registros = await this.dep.registroRepo.listarPorServicio(idServicio);
+    return { servicio, registros };
   }
 }

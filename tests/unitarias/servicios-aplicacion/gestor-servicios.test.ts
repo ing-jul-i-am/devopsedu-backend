@@ -13,7 +13,9 @@ function crearDeps() {
       crearConConfiguracion: vi.fn(),
       buscarPorIdConConfiguracionVigente: vi.fn(),
       agregarConfiguracion: vi.fn(),
+      listarActivosPorUsuario: vi.fn(),
     },
+    registroRepo: { listarPorServicio: vi.fn() },
     verificador: { verificarDisponibilidad: vi.fn() },
   };
 }
@@ -135,5 +137,65 @@ describe("GestorServicios.editarConfiguracion", () => {
     // Assert
     await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
     expect(dep.servicioRepo.agregarConfiguracion).not.toHaveBeenCalled();
+  });
+});
+
+describe("GestorServicios.listarPanel", () => {
+  it("devuelve los servicios activos del usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.listarActivosPorUsuario.mockResolvedValue([
+      { idServicio: 1 },
+      { idServicio: 2 },
+    ]);
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const panel = await gestor.listarPanel(7);
+
+    // Assert
+    expect(dep.servicioRepo.listarActivosPorUsuario).toHaveBeenCalledWith(7);
+    expect(panel).toHaveLength(2);
+  });
+});
+
+describe("GestorServicios.obtenerDetalle", () => {
+  it("devuelve el servicio con su historico cuando pertenece al usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 7,
+      configuraciones: [],
+    });
+    dep.registroRepo.listarPorServicio.mockResolvedValue([
+      { operacion: "desplegar" },
+    ]);
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const detalle = await gestor.obtenerDetalle(7, 1);
+
+    // Assert
+    expect(detalle.servicio.idServicio).toBe(1);
+    expect(detalle.registros).toHaveLength(1);
+  });
+
+  it("lanza ServicioNoEncontradoError cuando el servicio es de otro usuario", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue({
+      idServicio: 1,
+      idUsuario: 99,
+      configuraciones: [],
+    });
+    const gestor = new GestorServicios(dep as never);
+
+    // Act
+    const intento = gestor.obtenerDetalle(7, 1);
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ServicioNoEncontradoError);
+    expect(dep.registroRepo.listarPorServicio).not.toHaveBeenCalled();
   });
 });

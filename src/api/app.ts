@@ -6,6 +6,7 @@
 import express, { type Express, type RequestHandler } from "express";
 import type { Autenticador } from "../servicios-aplicacion/autenticador.js";
 import type { GestorServicios } from "../servicios-aplicacion/gestor-servicios.js";
+import type { GestorDocker } from "../servicios-aplicacion/gestor-docker.js";
 import type { VerificadorRecursos } from "../servicios-aplicacion/verificador-recursos.js";
 import { crearRutasAuth } from "./rutas/auth.rutas.js";
 import { crearRutasServicios } from "./rutas/servicios.rutas.js";
@@ -15,6 +16,7 @@ import { manejadorErrores } from "./middlewares/manejador-errores.js";
 export interface DependenciasApp {
   autenticador: Autenticador;
   gestorServicios: GestorServicios;
+  gestorDocker: GestorDocker;
   verificador: VerificadorRecursos;
   autenticar: RequestHandler;
 }
@@ -27,7 +29,11 @@ export function crearApp(dependencias: DependenciasApp): Express {
   app.use("/api/auth", crearRutasAuth(dependencias.autenticador));
   app.use(
     "/api/servicios",
-    crearRutasServicios(dependencias.gestorServicios, dependencias.autenticar)
+    crearRutasServicios(
+      dependencias.gestorServicios,
+      dependencias.gestorDocker,
+      dependencias.autenticar
+    )
   );
   app.use(
     "/api/servidor",
