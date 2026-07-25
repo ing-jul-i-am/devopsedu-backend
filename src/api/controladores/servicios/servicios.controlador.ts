@@ -8,6 +8,7 @@ import type { GestorServicios } from "../../../servicios-aplicacion/gestor-servi
 import type { ServicioConConfiguraciones } from "../../../repositorios/servicio-repo.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ServicioNoEncontradoError } from "../../../dominio/errores/servicio-no-encontrado-error.js";
+import { CATALOGO_IMAGENES } from "../../../dominio/catalogo-imagenes.js";
 
 function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
   const vigente = servicio.configuraciones[0];
@@ -34,7 +35,12 @@ function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
 export function crearControladoresServicios(gestor: GestorServicios): {
   crear: RequestHandler;
   editarConfiguracion: RequestHandler;
+  listarImagenes: RequestHandler;
 } {
+  const listarImagenes: RequestHandler = (_req, res) => {
+    res.status(200).json(CATALOGO_IMAGENES);
+  };
+
   const crear: RequestHandler = async (req, res, next) => {
     try {
       const usuario = req.usuario;
@@ -69,5 +75,5 @@ export function crearControladoresServicios(gestor: GestorServicios): {
     }
   };
 
-  return { crear, editarConfiguracion };
+  return { crear, editarConfiguracion, listarImagenes };
 }

@@ -18,6 +18,9 @@ export function crearRutasServicios(
   const router = Router();
   const controladores = crearControladoresServicios(gestor);
 
+  // RF-07: catalogo de imagenes sugeridas (solo lectura).
+  router.get("/imagenes", autenticar, controladores.listarImagenes);
+
   router.post(
     "/",
     autenticar,
