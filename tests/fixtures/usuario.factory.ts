@@ -14,6 +14,10 @@ export interface ParcialesUsuario {
   idRol?: number;
 }
 
+// Contador para generar correos unicos por defecto y no chocar con la restriccion @unique
+// cuando un mismo test crea varios usuarios sin especificar el correo.
+let secuenciaUsuario = 0;
+
 export async function crearUsuarioEnBd(
   parciales: ParcialesUsuario = {}
 ): Promise<Usuario> {
@@ -22,7 +26,7 @@ export async function crearUsuarioEnBd(
   return prismaTest.usuario.create({
     data: {
       nombre: parciales.nombre ?? "Estudiante de prueba",
-      correo: parciales.correo ?? "estudiante@devopsedu.local",
+      correo: parciales.correo ?? `usuario-${++secuenciaUsuario}@devopsedu.local`,
       contrasenaCifrada: parciales.contrasenaCifrada ?? "hash_falso",
       idRol,
     },

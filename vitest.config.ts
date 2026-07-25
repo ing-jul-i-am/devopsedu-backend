@@ -5,6 +5,11 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
+    // Los tests de integracion comparten una unica base de pruebas. Serializamos la
+    // ejecucion de archivos para que el limpiado (TRUNCATE) de un archivo no interfiera
+    // con las operaciones de otro que corra en paralelo. La suite es pequena (piramide
+    // de pruebas), por lo que el costo es despreciable.
+    fileParallelism: false,
     setupFiles: ["./tests/configuracion/setup-cada-test.ts"],
     globalSetup: "./tests/configuracion/setup-global.ts",
     coverage: {

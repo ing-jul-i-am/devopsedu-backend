@@ -10,10 +10,14 @@ export interface ParcialesRol {
   permisos?: string[];
 }
 
+// Contador para generar nombres unicos por defecto y no chocar con la restriccion @unique
+// cuando un mismo test crea varios roles sin especificar el nombre.
+let secuenciaRol = 0;
+
 export async function crearRolEnBd(parciales: ParcialesRol = {}): Promise<Rol> {
   return prismaTest.rol.create({
     data: {
-      nombre: parciales.nombre ?? "estudiante",
+      nombre: parciales.nombre ?? `rol-prueba-${++secuenciaRol}`,
       permisos: parciales.permisos ?? [],
     },
   });
