@@ -6,20 +6,23 @@
 import type { Usuario } from "@prisma/client";
 import type { UsuarioRepo } from "../repositorios/usuario-repo.js";
 import type { SesionRepo } from "../repositorios/sesion-repo.js";
+import type { RolRepo } from "../repositorios/rol-repo.js";
 import type { Cifrador } from "../infraestructura/cifrador.js";
 import type { EmisorToken } from "../infraestructura/emisor-token.js";
 import { CredencialesInvalidasError } from "../dominio/errores/credenciales-invalidas-error.js";
 import { CorreoYaRegistradoError } from "../dominio/errores/correo-ya-registrado-error.js";
+import { RolNoDisponibleError } from "../dominio/errores/rol-no-disponible-error.js";
 
 // Vista publica del usuario: excluye la contrasena cifrada por lista explicita, de modo que
 // una futura columna sensible del esquema no se filtre por accidente (RNF-12).
 export type UsuarioPublico = Omit<Usuario, "contrasenaCifrada">;
 
+// El auto-registro no acepta el rol desde el cliente: el servidor asigna siempre el rol por
+// defecto (rolPorDefecto) para evitar escalamiento de privilegios (RNF-14).
 export interface DatosRegistro {
   nombre: string;
   correo: string;
   contrasena: string;
-  idRol: number;
 }
 
 export interface ResultadoInicioSesion {
@@ -30,8 +33,10 @@ export interface ResultadoInicioSesion {
 export interface DependenciasAutenticador {
   usuarioRepo: UsuarioRepo;
   sesionRepo: SesionRepo;
+  rolRepo: RolRepo;
   cifrador: Cifrador;
   emisor: EmisorToken;
+  rolPorDefecto: string;
   expiracionTokenSegundos: number;
 }
 
@@ -44,12 +49,17 @@ export class Autenticador {
       throw new CorreoYaRegistradoError();
     }
 
+    const rol = await this.dep.rolRepo.buscarPorNombre(this.dep.rolPorDefecto);
+    if (!rol) {
+      throw new RolNoDisponibleError(this.dep.rolPorDefecto);
+    }
+
     const contrasenaCifrada = await this.dep.cifrador.cifrar(datos.contrasena);
     const usuario = await this.dep.usuarioRepo.crear({
       nombre: datos.nombre,
       correo: datos.correo,
       contrasenaCifrada,
-      idRol: datos.idRol,
+      idRol: rol.idRol,
     });
 
     return this.aUsuarioPublico(usuario);

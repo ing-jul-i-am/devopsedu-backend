@@ -8,6 +8,7 @@ import type { DependenciasAutenticador } from "@/servicios-aplicacion/autenticad
 import { Autenticador } from "@/servicios-aplicacion/autenticador.js";
 import { CredencialesInvalidasError } from "@/dominio/errores/credenciales-invalidas-error.js";
 import { CorreoYaRegistradoError } from "@/dominio/errores/correo-ya-registrado-error.js";
+import { RolNoDisponibleError } from "@/dominio/errores/rol-no-disponible-error.js";
 import { crearUsuario } from "../../fixtures/usuario.factory.js";
 
 function crearDependencias() {
@@ -22,6 +23,9 @@ function crearDependencias() {
       revocarPorToken: vi.fn(),
       buscarPorToken: vi.fn(),
     },
+    rolRepo: {
+      buscarPorNombre: vi.fn(),
+    },
     cifrador: {
       cifrar: vi.fn(),
       verificar: vi.fn(),
@@ -30,6 +34,7 @@ function crearDependencias() {
       emitir: vi.fn(),
       verificar: vi.fn(),
     },
+    rolPorDefecto: "estudiante",
     expiracionTokenSegundos: 3600,
   };
 }
@@ -48,12 +53,17 @@ describe("Autenticador", () => {
   });
 
   describe("registrar", () => {
-    it("cifra la contrasena y crea el usuario cuando el correo no existe", async () => {
+    it("asigna el rol por defecto, cifra la contrasena y crea el usuario", async () => {
       // Arrange
       dep.usuarioRepo.buscarPorCorreo.mockResolvedValue(null);
+      dep.rolRepo.buscarPorNombre.mockResolvedValue({
+        idRol: 2,
+        nombre: "estudiante",
+        permisos: [],
+      });
       dep.cifrador.cifrar.mockResolvedValue("hash_generado");
       dep.usuarioRepo.crear.mockResolvedValue(
-        crearUsuario({ correo: "nuevo@devopsedu.local" })
+        crearUsuario({ correo: "nuevo@devopsedu.local", idRol: 2 })
       );
       const autenticador = crearAutenticador(dep);
 
@@ -62,16 +72,16 @@ describe("Autenticador", () => {
         nombre: "Nuevo Estudiante",
         correo: "nuevo@devopsedu.local",
         contrasena: "Clave_segura_1",
-        idRol: 1,
       });
 
       // Assert
+      expect(dep.rolRepo.buscarPorNombre).toHaveBeenCalledWith("estudiante");
       expect(dep.cifrador.cifrar).toHaveBeenCalledWith("Clave_segura_1");
       expect(dep.usuarioRepo.crear).toHaveBeenCalledWith(
         expect.objectContaining({
           correo: "nuevo@devopsedu.local",
           contrasenaCifrada: "hash_generado",
-          idRol: 1,
+          idRol: 2,
         })
       );
     });
@@ -86,7 +96,6 @@ describe("Autenticador", () => {
         nombre: "X",
         correo: "estudiante@devopsedu.local",
         contrasena: "Clave_segura_1",
-        idRol: 1,
       });
 
       // Assert
@@ -94,9 +103,32 @@ describe("Autenticador", () => {
       expect(dep.usuarioRepo.crear).not.toHaveBeenCalled();
     });
 
+    it("lanza RolNoDisponibleError si el rol por defecto no existe", async () => {
+      // Arrange
+      dep.usuarioRepo.buscarPorCorreo.mockResolvedValue(null);
+      dep.rolRepo.buscarPorNombre.mockResolvedValue(null);
+      const autenticador = crearAutenticador(dep);
+
+      // Act
+      const intento = autenticador.registrar({
+        nombre: "Nuevo",
+        correo: "nuevo@devopsedu.local",
+        contrasena: "Clave_segura_1",
+      });
+
+      // Assert
+      await expect(intento).rejects.toBeInstanceOf(RolNoDisponibleError);
+      expect(dep.usuarioRepo.crear).not.toHaveBeenCalled();
+    });
+
     it("no expone la contrasena cifrada en el usuario devuelto (RNF-12)", async () => {
       // Arrange
       dep.usuarioRepo.buscarPorCorreo.mockResolvedValue(null);
+      dep.rolRepo.buscarPorNombre.mockResolvedValue({
+        idRol: 2,
+        nombre: "estudiante",
+        permisos: [],
+      });
       dep.cifrador.cifrar.mockResolvedValue("hash_generado");
       dep.usuarioRepo.crear.mockResolvedValue(
         crearUsuario({ contrasenaCifrada: "hash_generado" })
@@ -108,7 +140,6 @@ describe("Autenticador", () => {
         nombre: "Nuevo",
         correo: "nuevo@devopsedu.local",
         contrasena: "Clave_segura_1",
-        idRol: 1,
       });
 
       // Assert
