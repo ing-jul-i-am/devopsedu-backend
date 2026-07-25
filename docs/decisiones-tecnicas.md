@@ -134,3 +134,28 @@ mantener la coherencia documental.
 **Alternativas consideradas:**
 - Mantener 1:1 y editar en sitio. Descartada porque incumple el criterio de aceptacion de RF-08
   (no habria historico de configuraciones).
+
+---
+
+## DT-05: registro_despliegue incorpora el campo 'operacion' para cumplir RF-15
+
+**Fecha:** 2026-07-25
+
+**Contexto:** RF-15 exige "registrar cada operacion de despliegue, detencion, reinicio o
+eliminacion, incluyendo usuario, fecha y resultado", y RF-17 habla del "historico de
+operaciones". Sin embargo, la entidad `RegistroDespliegue` del diagrama ER (seccion 4.2.17) solo
+contempla `fecha_hora`, `resultado`, `mensaje_error`, `id_servicio` e `id_usuario`, sin un campo
+que identifique el tipo de operacion. Con ese modelo no es posible distinguir en el historico si
+un registro corresponde a un despliegue, una detencion, un reinicio o una eliminacion.
+
+**Decision:** Con aprobacion del autor, se agrega la columna `operacion` (VarChar 20) a
+`registro_despliegue`. Valores esperados: `desplegar`, `detener`, `reiniciar`, `eliminar`.
+
+Migracion: `agrega_operacion_registro_despliegue`.
+
+**Consecuencias:** Se cumple RF-15 y el historico de RF-17 distingue el tipo de operacion. Se
+aparta del ER; el diagrama debe actualizarse para incluir el campo en la proxima revision.
+
+**Alternativas consideradas:**
+- Registrar solo `resultado` (como el ER y el skill integracion-docker). Descartada porque deja
+  RF-15/RF-17 incompletos (el historico no distinguiria el tipo de operacion).

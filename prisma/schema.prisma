@@ -99,6 +99,9 @@ model ConfiguracionServicio {
 model RegistroDespliegue {
   idRegistro   Int      @id @default(autoincrement()) @map("id_registro")
   fechaHora    DateTime @default(now()) @map("fecha_hora")
+  // RF-15: tipo de operacion (desplegar/detener/reiniciar/eliminar). Se aparta del ER, que no
+  // contemplaba este campo (ver docs/decisiones-tecnicas.md DT-05).
+  operacion    String   @db.VarChar(20)
   resultado    String   @db.VarChar(20)
   mensajeError String?  @map("mensaje_error") @db.Text
   idServicio   Int      @map("id_servicio")
