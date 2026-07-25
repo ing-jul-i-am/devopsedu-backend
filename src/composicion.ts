@@ -17,6 +17,7 @@ import { Autenticador } from "./servicios-aplicacion/autenticador.js";
 import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos.js";
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
+import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import type { DependenciasApp } from "./api/app.js";
 
@@ -25,12 +26,17 @@ export interface ConfigApp {
   jwtExpiracionSegundos: number;
   rolPorDefecto: string;
   almacenamientoTotalMb: number;
+  monitorIntervaloMs: number;
 }
+
+export type DependenciasCompletas = DependenciasApp & {
+  monitor: MonitorPeriodico;
+};
 
 export function construirDependencias(
   prisma: PrismaClient,
   config: ConfigApp
-): DependenciasApp {
+): DependenciasCompletas {
   const usuarioRepo = new UsuarioRepo(prisma);
   const sesionRepo = new SesionRepo(prisma);
   const rolRepo = new RolRepo(prisma);
@@ -72,11 +78,19 @@ export function construirDependencias(
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
 
+  const monitor = new MonitorPeriodico({
+    servicioRepo,
+    metricaRepo,
+    registroRepo,
+    intervaloMs: config.monitorIntervaloMs,
+  });
+
   return {
     autenticador,
     gestorServicios,
     gestorDocker,
     verificador,
     autenticar,
+    monitor,
   };
 }

@@ -111,6 +111,14 @@ export class ServicioRepo {
     });
   }
 
+  // Servicios en ejecucion de todos los usuarios. Lo usa el monitor periodico para recolectar
+  // metricas de consumo (RF-16, RF-18).
+  async listarEnEjecucion(): Promise<Servicio[]> {
+    return this.prisma.servicio.findMany({
+      where: { estado: "en_ejecucion" },
+    });
+  }
+
   // RF-16: servicios no eliminados del usuario con su configuracion vigente, para el panel.
   async listarActivosPorUsuario(
     idUsuario: number

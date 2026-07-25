@@ -280,4 +280,30 @@ describe("ServicioRepo", () => {
       expect(activosB).toHaveLength(0);
     });
   });
+
+  describe("listarEnEjecucion", () => {
+    it("devuelve solo los servicios en estado en_ejecucion, de cualquier usuario", async () => {
+      // Arrange
+      const usuario1 = await crearUsuarioEnBd();
+      const usuario2 = await crearUsuarioEnBd();
+      const a = await repo.crearConConfiguracion({
+        idUsuario: usuario1.idUsuario,
+        nombre: "a",
+        configuracion: configValida(),
+      });
+      await repo.actualizarEstado(a.idServicio, "en_ejecucion");
+      await repo.crearConConfiguracion({
+        idUsuario: usuario2.idUsuario,
+        nombre: "b",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const enEjecucion = await repo.listarEnEjecucion();
+
+      // Assert
+      expect(enEjecucion).toHaveLength(1);
+      expect(enEjecucion[0]?.nombre).toBe("a");
+    });
+  });
 });

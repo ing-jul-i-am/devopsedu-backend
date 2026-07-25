@@ -26,6 +26,8 @@ const esquemaConfiguracion = z.object({
     .int()
     .positive()
     .default(20480),
+  // Frecuencia del monitor de metricas en ms. No debe superar 5000 (RNF-09).
+  MONITOR_INTERVALO_MS: z.coerce.number().int().positive().max(5000).default(5000),
 });
 
 export type Configuracion = z.infer<typeof esquemaConfiguracion>;

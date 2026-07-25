@@ -15,10 +15,13 @@ const dependencias = construirDependencias(prismaCliente, {
   jwtExpiracionSegundos: configuracion.JWT_EXPIRACION_SEGUNDOS,
   rolPorDefecto: configuracion.ROL_POR_DEFECTO,
   almacenamientoTotalMb: configuracion.SERVIDOR_ALMACENAMIENTO_TOTAL_MB,
+  monitorIntervaloMs: configuracion.MONITOR_INTERVALO_MS,
 });
 
 const app = crearApp(dependencias);
 
 app.listen(configuracion.PORT, () => {
   logger.info({ evento: "servidor_iniciado", puerto: configuracion.PORT });
+  // RF-16/RF-18/RNF-09: inicia la recoleccion periodica de metricas de los servicios activos.
+  dependencias.monitor.iniciar();
 });

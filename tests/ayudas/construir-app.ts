@@ -13,6 +13,7 @@ export function construirApp(): Express {
     jwtExpiracionSegundos: 3600,
     rolPorDefecto: "estudiante",
     almacenamientoTotalMb: 20480,
+    monitorIntervaloMs: 5000,
   });
   return crearApp(dependencias);
 }
