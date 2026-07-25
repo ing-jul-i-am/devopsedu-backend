@@ -159,3 +159,35 @@ aparta del ER; el diagrama debe actualizarse para incluir el campo en la proxima
 **Alternativas consideradas:**
 - Registrar solo `resultado` (como el ER y el skill integracion-docker). Descartada porque deja
   RF-15/RF-17 incompletos (el historico no distinguiria el tipo de operacion).
+
+---
+
+## DT-06: la verificacion de recursos mide la disponibilidad real del sistema operativo
+
+**Fecha:** 2026-07-25
+
+**Contexto:** El flujo CU-04 del diseno calcula los recursos disponibles como la capacidad total
+del servidor menos "el consumo actual de los contenedores activos" consultado a Docker. Ese
+modelo no descuenta el uso del propio sistema operativo ni de otros programas ajenos a la
+plataforma, por lo que sobreestima lo realmente disponible en la maquina.
+
+**Decision:** Con aprobacion del autor, el `VerificadorRecursos` mide la disponibilidad
+directamente del sistema operativo:
+
+- Memoria: `os.freemem()` (RAM libre real; incluye el uso del SO, otros programas y Docker).
+- Disco: `fs.statfs(ruta)` (espacio libre real del sistema de archivos).
+- CPU: `os.cpus().length` menos `os.loadavg()[0]` (demanda promedio del sistema).
+
+Asi, lo disponible refleja el estado real de la maquina y `comprometido = total - disponible`
+contempla todo el consumo. La medicion se inyecta como dependencia para que las pruebas sean
+deterministas (no dependan del estado real del equipo). Se elimino
+`ServicioRepo.sumarRecursosVigentes`, que quedo sin uso.
+
+**Consecuencias:** La verificacion es realista respecto a la maquina completa. El resultado
+fluctua con el uso del equipo y la parte de CPU es una aproximacion por carga. Se aparta de la
+redaccion literal de CU-04 (que solo descuenta contenedores Docker); el diseno deberia
+actualizarse en consecuencia.
+
+**Alternativas consideradas:**
+- Restar solo el consumo/reserva de los contenedores Docker (fiel a CU-04). Descartada porque no
+  toma en cuenta el uso del SO ni de otros programas, como observo el autor.

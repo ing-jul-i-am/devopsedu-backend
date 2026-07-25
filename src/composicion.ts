@@ -12,7 +12,10 @@ import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.
 import { MetricaRepo } from "./repositorios/metrica-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
-import { crearLectorCapacidad } from "./infraestructura/capacidad-servidor.js";
+import {
+  crearMedidorRecursos,
+  type MedicionRecursos,
+} from "./infraestructura/capacidad-servidor.js";
 import { Autenticador } from "./servicios-aplicacion/autenticador.js";
 import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos.js";
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
@@ -25,7 +28,7 @@ export interface ConfigApp {
   jwtSecreto: string;
   jwtExpiracionSegundos: number;
   rolPorDefecto: string;
-  almacenamientoTotalMb: number;
+  rutaDisco: string;
   monitorIntervaloMs: number;
 }
 
@@ -35,7 +38,12 @@ export type DependenciasCompletas = DependenciasApp & {
 
 export function construirDependencias(
   prisma: PrismaClient,
-  config: ConfigApp
+  config: ConfigApp,
+  // Permite inyectar una medicion determinista en pruebas; en produccion se usa el medidor real
+  // basado en el sistema operativo.
+  medirRecursos: () => Promise<MedicionRecursos> = crearMedidorRecursos(
+    config.rutaDisco
+  )
 ): DependenciasCompletas {
   const usuarioRepo = new UsuarioRepo(prisma);
   const sesionRepo = new SesionRepo(prisma);
@@ -60,10 +68,7 @@ export function construirDependencias(
     expiracionTokenSegundos: config.jwtExpiracionSegundos,
   });
 
-  const verificador = new VerificadorRecursos({
-    servicioRepo,
-    capacidadTotal: crearLectorCapacidad(config.almacenamientoTotalMb),
-  });
+  const verificador = new VerificadorRecursos({ medirRecursos });
   const gestorServicios = new GestorServicios({
     servicioRepo,
     registroRepo,

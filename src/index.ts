@@ -14,7 +14,7 @@ const dependencias = construirDependencias(prismaCliente, {
   jwtSecreto: configuracion.JWT_SECRET,
   jwtExpiracionSegundos: configuracion.JWT_EXPIRACION_SEGUNDOS,
   rolPorDefecto: configuracion.ROL_POR_DEFECTO,
-  almacenamientoTotalMb: configuracion.SERVIDOR_ALMACENAMIENTO_TOTAL_MB,
+  rutaDisco: configuracion.SERVIDOR_RUTA_DISCO,
   monitorIntervaloMs: configuracion.MONITOR_INTERVALO_MS,
 });
 

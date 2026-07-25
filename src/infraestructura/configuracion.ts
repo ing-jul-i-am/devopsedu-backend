@@ -19,13 +19,8 @@ const esquemaConfiguracion = z.object({
   JWT_EXPIRACION_SEGUNDOS: z.coerce.number().int().positive().default(3600),
   PORT: z.coerce.number().int().positive().default(3000),
   ROL_POR_DEFECTO: z.string().min(1).default("estudiante"),
-  // Capacidad de almacenamiento del servidor en MB (RF-09/RF-10). El sistema operativo no
-  // expone el disco de forma portable, por lo que se declara explicitamente.
-  SERVIDOR_ALMACENAMIENTO_TOTAL_MB: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(20480),
+  // Ruta del sistema de archivos a inspeccionar para el espacio en disco libre (RF-09/RF-10).
+  SERVIDOR_RUTA_DISCO: z.string().min(1).default("/"),
   // Frecuencia del monitor de metricas en ms. No debe superar 5000 (RNF-09).
   MONITOR_INTERVALO_MS: z.coerce.number().int().positive().max(5000).default(5000),
 });

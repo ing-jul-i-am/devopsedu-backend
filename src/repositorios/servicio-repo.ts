@@ -67,39 +67,6 @@ export class ServicioRepo {
     });
   }
 
-  // Suma los recursos de la configuracion vigente de cada servicio no eliminado. Sustenta la
-  // verificacion de recursos: representa lo ya comprometido en la base de datos (RF-09).
-  async sumarRecursosVigentes(): Promise<{
-    cpu: number;
-    memoria: number;
-    almacenamiento: number;
-  }> {
-    const servicios = await this.prisma.servicio.findMany({
-      where: { estado: { not: "eliminado" } },
-      include: {
-        configuraciones: {
-          orderBy: [{ fechaCreacion: "desc" }, { idConfiguracion: "desc" }],
-          take: 1,
-        },
-      },
-    });
-
-    let cpu = 0;
-    let memoria = 0;
-    let almacenamiento = 0;
-    for (const servicio of servicios) {
-      const vigente = servicio.configuraciones[0];
-      if (!vigente) {
-        continue;
-      }
-      cpu += Number(vigente.cpuAsignado);
-      memoria += vigente.memoriaAsignada;
-      almacenamiento += vigente.almacenamientoAsignado;
-    }
-
-    return { cpu, memoria, almacenamiento };
-  }
-
   // Actualiza el estado del servicio conforme a la maquina de estados (seccion 4.2.14).
   async actualizarEstado(
     idServicio: number,

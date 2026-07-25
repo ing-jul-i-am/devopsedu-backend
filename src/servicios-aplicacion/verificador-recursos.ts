@@ -1,18 +1,16 @@
 // src/servicios-aplicacion/verificador-recursos.ts
 // Servicio de aplicacion que evalua la disponibilidad de recursos del servidor antes de
-// autorizar la configuracion/despliegue de un servicio. En esta etapa lo disponible se calcula
-// como la capacidad del servidor menos lo ya comprometido en la base de datos. Al cerrar la
-// Etapa 5 esta medicion se hara realista consultando el consumo real via Dockerode (CU-04).
+// autorizar el despliegue de un servicio. Lo disponible proviene de una medicion del sistema
+// operativo (memoria y disco libres, carga de CPU), por lo que descuenta el uso real de toda la
+// maquina: SO, otros programas y contenedores Docker (CU-04).
 // Cubre: RF-09, RF-10, RNF-07
 
-import type { ServicioRepo } from "../repositorios/servicio-repo.js";
-import type { CapacidadServidor } from "../infraestructura/capacidad-servidor.js";
+import type {
+  MedicionRecursos,
+  Recursos,
+} from "../infraestructura/capacidad-servidor.js";
 
-export interface Recursos {
-  cpu: number;
-  memoria: number;
-  almacenamiento: number;
-}
+export type { Recursos };
 
 export interface ResultadoVerificacion {
   aprobado: boolean;
@@ -27,8 +25,7 @@ export interface CapacidadConsultada {
 }
 
 export interface DependenciasVerificador {
-  servicioRepo: Pick<ServicioRepo, "sumarRecursosVigentes">;
-  capacidadTotal: () => CapacidadServidor;
+  medirRecursos: () => Promise<MedicionRecursos>;
 }
 
 export class VerificadorRecursos {
@@ -37,7 +34,7 @@ export class VerificadorRecursos {
   async verificarDisponibilidad(
     solicitado: Recursos
   ): Promise<ResultadoVerificacion> {
-    const disponible = await this.calcularDisponible();
+    const { disponible } = await this.dep.medirRecursos();
     const aprobado =
       solicitado.cpu <= disponible.cpu &&
       solicitado.memoria <= disponible.memoria &&
@@ -47,23 +44,12 @@ export class VerificadorRecursos {
   }
 
   async consultarCapacidad(): Promise<CapacidadConsultada> {
-    const total = this.dep.capacidadTotal();
-    const comprometido = await this.dep.servicioRepo.sumarRecursosVigentes();
-    const disponible = this.restar(total, comprometido);
-    return { total, comprometido, disponible };
-  }
-
-  private async calcularDisponible(): Promise<Recursos> {
-    const total = this.dep.capacidadTotal();
-    const comprometido = await this.dep.servicioRepo.sumarRecursosVigentes();
-    return this.restar(total, comprometido);
-  }
-
-  private restar(total: Recursos, comprometido: Recursos): Recursos {
-    return {
-      cpu: total.cpu - comprometido.cpu,
-      memoria: total.memoria - comprometido.memoria,
-      almacenamiento: total.almacenamiento - comprometido.almacenamiento,
+    const { total, disponible } = await this.dep.medirRecursos();
+    const comprometido: Recursos = {
+      cpu: Number((total.cpu - disponible.cpu).toFixed(2)),
+      memoria: total.memoria - disponible.memoria,
+      almacenamiento: total.almacenamiento - disponible.almacenamiento,
     };
+    return { total, comprometido, disponible };
   }
 }
