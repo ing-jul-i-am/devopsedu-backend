@@ -8,6 +8,7 @@ import { CorreoYaRegistradoError } from "../../dominio/errores/correo-ya-registr
 import { TokenInvalidoError } from "../../dominio/errores/token-invalido-error.js";
 import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-error.js";
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
+import { RecursosInsuficientesError } from "../../dominio/errores/recursos-insuficientes-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
 export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
@@ -31,6 +32,16 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
 
   if (err instanceof CorreoYaRegistradoError) {
     res.status(409).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof RecursosInsuficientesError) {
+    // RF-09: se informa al usuario los valores solicitados y los disponibles.
+    res.status(422).json({
+      error: err.message,
+      solicitado: err.solicitado,
+      disponible: err.disponible,
+    });
     return;
   }
 

@@ -3,20 +3,21 @@
 // dependencias y levanta el servidor HTTP.
 
 import { crearApp } from "./api/app.js";
-import { construirAutenticador } from "./composicion.js";
+import { construirDependencias } from "./composicion.js";
 import { prismaCliente } from "./infraestructura/prisma-cliente.js";
 import { cargarConfiguracion } from "./infraestructura/configuracion.js";
 import { logger } from "./infraestructura/logger.js";
 
 const configuracion = cargarConfiguracion();
 
-const autenticador = construirAutenticador(prismaCliente, {
+const dependencias = construirDependencias(prismaCliente, {
   jwtSecreto: configuracion.JWT_SECRET,
   jwtExpiracionSegundos: configuracion.JWT_EXPIRACION_SEGUNDOS,
   rolPorDefecto: configuracion.ROL_POR_DEFECTO,
+  almacenamientoTotalMb: configuracion.SERVIDOR_ALMACENAMIENTO_TOTAL_MB,
 });
 
-const app = crearApp({ autenticador });
+const app = crearApp(dependencias);
 
 app.listen(configuracion.PORT, () => {
   logger.info({ evento: "servidor_iniciado", puerto: configuracion.PORT });

@@ -4,14 +4,15 @@
 
 import type { Express } from "express";
 import { crearApp } from "@/api/app.js";
-import { construirAutenticador } from "@/composicion.js";
+import { construirDependencias } from "@/composicion.js";
 import { prismaTest } from "./prisma-test.js";
 
 export function construirApp(): Express {
-  const autenticador = construirAutenticador(prismaTest, {
+  const dependencias = construirDependencias(prismaTest, {
     jwtSecreto: "secreto-de-prueba",
     jwtExpiracionSegundos: 3600,
     rolPorDefecto: "estudiante",
+    almacenamientoTotalMb: 20480,
   });
-  return crearApp({ autenticador });
+  return crearApp(dependencias);
 }
