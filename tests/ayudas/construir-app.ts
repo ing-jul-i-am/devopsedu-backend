@@ -22,6 +22,7 @@ export function construirApp(): Express {
       rolPorDefecto: "estudiante",
       rutaDisco: "/",
       monitorIntervaloMs: 5000,
+      corsOrigenes: ["http://localhost:5173"],
     },
     medirRecursos
   );

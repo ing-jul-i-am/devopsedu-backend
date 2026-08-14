@@ -19,11 +19,13 @@ export interface DependenciasApp {
   gestorDocker: GestorDocker;
   verificador: VerificadorRecursos;
   autenticar: RequestHandler;
+  cors: RequestHandler;
 }
 
 export function crearApp(dependencias: DependenciasApp): Express {
   const app = express();
 
+  app.use(dependencias.cors);
   app.use(express.json());
 
   app.use("/api/auth", crearRutasAuth(dependencias.autenticador));

@@ -191,3 +191,35 @@ actualizarse en consecuencia.
 **Alternativas consideradas:**
 - Restar solo el consumo/reserva de los contenedores Docker (fiel a CU-04). Descartada porque no
   toma en cuenta el uso del SO ni de otros programas, como observo el autor.
+
+---
+
+## DT-07: middleware CORS explicito para permitir el consumo desde el frontend
+
+**Fecha:** 2026-08-14
+
+**Contexto:** El backend no tenia ningun middleware CORS. Postman no aplica la politica de mismo
+origen, por lo que las pruebas manuales con esa herramienta funcionaban, pero el frontend
+(servido en `http://localhost:5173` con Vite) es bloqueado por el navegador: el preflight
+`OPTIONS` no recibe el encabezado `Access-Control-Allow-Origin` y la peticion real nunca llega
+a la API. Esto no esta cubierto por ningun RF/RNF/CU especifico del catalogo, que asume la
+interaccion pero no detalla el mecanismo de habilitacion entre origenes.
+
+**Decision:** Se agrega el paquete `cors` y un middleware propio (`crearCors`, en
+`src/api/middlewares/cors.ts`) que permite unicamente los origenes configurados via la variable
+de entorno `CORS_ORIGENES` (lista separada por comas, con
+`http://localhost:5173,http://127.0.0.1:5173` como valor por defecto para desarrollo). El
+middleware se monta en `crearApp` antes que cualquier otro, para que tambien intercepte el
+preflight `OPTIONS` de las rutas protegidas. No se habilitan credenciales (`credentials: true`)
+porque la autenticacion viaja en el encabezado `Authorization: Bearer`, no por cookies.
+
+**Consecuencias:** El frontend puede consumir la API desde el navegador. Agregar un nuevo origen
+de despliegue (p. ej. produccion) requiere actualizar `CORS_ORIGENES` en el entorno, no el
+codigo. Se agrega una dependencia nueva (`cors` + `@types/cors`), justificada porque reimplementar
+a mano el manejo de preflight, headers de Vary y metodos serialize-correctos es propenso a errores
+sutiles (RNF-15).
+
+**Alternativas consideradas:**
+- Middleware CORS escrito a mano sin dependencia nueva. Descartada por el riesgo de omitir
+  detalles del protocolo (encabezado `Vary: Origin`, manejo de `Access-Control-Request-Headers`
+  dinamico) que el paquete `cors` ya resuelve de forma probada.

@@ -16,6 +16,7 @@ const dependencias = construirDependencias(prismaCliente, {
   rolPorDefecto: configuracion.ROL_POR_DEFECTO,
   rutaDisco: configuracion.SERVIDOR_RUTA_DISCO,
   monitorIntervaloMs: configuracion.MONITOR_INTERVALO_MS,
+  corsOrigenes: configuracion.CORS_ORIGENES,
 });
 
 const app = crearApp(dependencias);

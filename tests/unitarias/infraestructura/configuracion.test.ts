@@ -65,4 +65,39 @@ describe("cargarConfiguracion", () => {
     // Assert
     expect(intento).toThrow(ConfiguracionInvalidaError);
   });
+
+  it("aplica el valor por defecto de CORS_ORIGENES cuando no se define", () => {
+    // Arrange
+    const entorno = {
+      DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+      JWT_SECRET: "una-clave-secreta-de-prueba-larga",
+    };
+
+    // Act
+    const config = cargarConfiguracion(entorno);
+
+    // Assert
+    expect(config.CORS_ORIGENES).toEqual([
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+    ]);
+  });
+
+  it("separa CORS_ORIGENES en una lista de origenes sin espacios", () => {
+    // Arrange
+    const entorno = {
+      DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+      JWT_SECRET: "una-clave-secreta-de-prueba-larga",
+      CORS_ORIGENES: "http://localhost:5173, http://midominio.com",
+    };
+
+    // Act
+    const config = cargarConfiguracion(entorno);
+
+    // Assert
+    expect(config.CORS_ORIGENES).toEqual([
+      "http://localhost:5173",
+      "http://midominio.com",
+    ]);
+  });
 });

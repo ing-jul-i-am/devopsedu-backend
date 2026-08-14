@@ -22,6 +22,7 @@ import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
 import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
+import { crearCors } from "./api/middlewares/cors.js";
 import type { DependenciasApp } from "./api/app.js";
 
 export interface ConfigApp {
@@ -30,6 +31,7 @@ export interface ConfigApp {
   rolPorDefecto: string;
   rutaDisco: string;
   monitorIntervaloMs: number;
+  corsOrigenes: string[];
 }
 
 export type DependenciasCompletas = DependenciasApp & {
@@ -82,6 +84,7 @@ export function construirDependencias(
   });
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
+  const cors = crearCors(config.corsOrigenes);
 
   const monitor = new MonitorPeriodico({
     servicioRepo,
@@ -96,6 +99,7 @@ export function construirDependencias(
     gestorDocker,
     verificador,
     autenticar,
+    cors,
     monitor,
   };
 }

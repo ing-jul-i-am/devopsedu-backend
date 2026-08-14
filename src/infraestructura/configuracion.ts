@@ -23,6 +23,18 @@ const esquemaConfiguracion = z.object({
   SERVIDOR_RUTA_DISCO: z.string().min(1).default("/"),
   // Frecuencia del monitor de metricas en ms. No debe superar 5000 (RNF-09).
   MONITOR_INTERVALO_MS: z.coerce.number().int().positive().max(5000).default(5000),
+  // Origenes autorizados a consumir la API desde el navegador (CORS), separados por comas.
+  // El valor por defecto cubre el servidor de desarrollo del frontend (Vite).
+  CORS_ORIGENES: z
+    .string()
+    .min(1)
+    .default("http://localhost:5173,http://127.0.0.1:5173")
+    .transform((valor) =>
+      valor
+        .split(",")
+        .map((origen) => origen.trim())
+        .filter((origen) => origen.length > 0)
+    ),
 });
 
 export type Configuracion = z.infer<typeof esquemaConfiguracion>;
