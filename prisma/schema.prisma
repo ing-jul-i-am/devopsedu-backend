@@ -12,21 +12,21 @@ datasource db {
 // ============================================================
 
 model Rol {
-  idRol     Int       @id @default(autoincrement()) @map("id_rol")
-  nombre    String    @unique @db.VarChar(50)
-  permisos  String[]
-  usuarios  Usuario[]
+  idRol    Int       @id @default(autoincrement()) @map("id_rol")
+  nombre   String    @unique @db.VarChar(50)
+  permisos String[]
+  usuarios Usuario[]
 
   @@map("rol")
 }
 
 model Usuario {
-  idUsuario           Int      @id @default(autoincrement()) @map("id_usuario")
-  nombre              String   @db.VarChar(120)
-  correo              String   @unique @db.VarChar(160)
-  contrasenaCifrada   String   @map("contrasena_cifrada") @db.VarChar(255)
-  fechaRegistro       DateTime @default(now()) @map("fecha_registro")
-  idRol               Int      @map("id_rol")
+  idUsuario         Int      @id @default(autoincrement()) @map("id_usuario")
+  nombre            String   @db.VarChar(120)
+  correo            String   @unique @db.VarChar(160)
+  contrasenaCifrada String   @map("contrasena_cifrada") @db.VarChar(255)
+  fechaRegistro     DateTime @default(now()) @map("fecha_registro")
+  idRol             Int      @map("id_rol")
 
   rol                 Rol                  @relation(fields: [idRol], references: [idRol], onDelete: Restrict)
   sesiones            Sesion[]
@@ -40,14 +40,14 @@ model Usuario {
 }
 
 model Sesion {
-  idSesion         Int      @id @default(autoincrement()) @map("id_sesion")
-  token            String   @unique @db.VarChar(512)
-  fechaInicio      DateTime @default(now()) @map("fecha_inicio")
-  fechaExpiracion  DateTime @map("fecha_expiracion")
-  estado           String   @db.VarChar(20)
-  idUsuario        Int      @map("id_usuario")
+  idSesion        Int      @id @default(autoincrement()) @map("id_sesion")
+  token           String   @unique @db.VarChar(512)
+  fechaInicio     DateTime @default(now()) @map("fecha_inicio")
+  fechaExpiracion DateTime @map("fecha_expiracion")
+  estado          String   @db.VarChar(20)
+  idUsuario       Int      @map("id_usuario")
 
-  usuario          Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
   @@index([token])
   @@index([idUsuario, estado])
@@ -59,17 +59,17 @@ model Sesion {
 // ============================================================
 
 model Servicio {
-  idServicio      Int       @id @default(autoincrement()) @map("id_servicio")
-  nombre          String    @db.VarChar(120)
-  descripcion     String?   @db.Text
-  estado          String    @db.VarChar(20)
-  fechaCreacion   DateTime  @default(now()) @map("fecha_creacion")
-  idUsuario       Int       @map("id_usuario")
+  idServicio    Int      @id @default(autoincrement()) @map("id_servicio")
+  nombre        String   @db.VarChar(120)
+  descripcion   String?  @db.Text
+  estado        String   @db.VarChar(20)
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion")
+  idUsuario     Int      @map("id_usuario")
 
-  usuario              Usuario               @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
-  configuracion        ConfiguracionServicio?
-  registrosDespliegue  RegistroDespliegue[]
-  metricas             Metrica[]
+  usuario             Usuario                 @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  configuraciones     ConfiguracionServicio[]
+  registrosDespliegue RegistroDespliegue[]
+  metricas            Metrica[]
 
   @@unique([idUsuario, nombre])
   @@index([estado])
@@ -77,31 +77,38 @@ model Servicio {
 }
 
 model ConfiguracionServicio {
-  idConfiguracion         Int      @id @default(autoincrement()) @map("id_configuracion")
-  imagenDocker            String   @map("imagen_docker") @db.VarChar(255)
-  cpuAsignado             Decimal  @map("cpu_asignado") @db.Decimal(4, 2)
-  memoriaAsignada         Int      @map("memoria_asignada")
-  almacenamientoAsignado  Int      @map("almacenamiento_asignado")
-  puertos                 Json
-  variablesEntorno        Json     @map("variables_entorno")
-  volumenes               Json
-  idServicio              Int      @unique @map("id_servicio")
+  idConfiguracion        Int      @id @default(autoincrement()) @map("id_configuracion")
+  imagenDocker           String   @map("imagen_docker") @db.VarChar(255)
+  cpuAsignado            Decimal  @map("cpu_asignado") @db.Decimal(4, 2)
+  memoriaAsignada        Int      @map("memoria_asignada")
+  almacenamientoAsignado Int      @map("almacenamiento_asignado")
+  puertos                Json
+  variablesEntorno       Json     @map("variables_entorno")
+  volumenes              Json
+  fechaCreacion          DateTime @default(now()) @map("fecha_creacion")
+  idServicio             Int      @map("id_servicio")
 
-  servicio                Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+  servicio Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
 
+  // RF-08: historico de configuraciones (1:N). La configuracion vigente es la mas reciente.
+  // Se aparta del ER 1:1 del diseno de forma deliberada (ver docs/decisiones-tecnicas.md DT-04).
+  @@index([idServicio, fechaCreacion])
   @@map("configuracion_servicio")
 }
 
 model RegistroDespliegue {
-  idRegistro    Int      @id @default(autoincrement()) @map("id_registro")
-  fechaHora     DateTime @default(now()) @map("fecha_hora")
-  resultado     String   @db.VarChar(20)
-  mensajeError  String?  @map("mensaje_error") @db.Text
-  idServicio    Int      @map("id_servicio")
-  idUsuario     Int      @map("id_usuario")
+  idRegistro   Int      @id @default(autoincrement()) @map("id_registro")
+  fechaHora    DateTime @default(now()) @map("fecha_hora")
+  // RF-15: tipo de operacion (desplegar/detener/reiniciar/eliminar). Se aparta del ER, que no
+  // contemplaba este campo (ver docs/decisiones-tecnicas.md DT-05).
+  operacion    String   @db.VarChar(20)
+  resultado    String   @db.VarChar(20)
+  mensajeError String?  @map("mensaje_error") @db.Text
+  idServicio   Int      @map("id_servicio")
+  idUsuario    Int      @map("id_usuario")
 
-  servicio      Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
-  usuario       Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  servicio Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@index([idServicio, fechaHora])
   @@map("registro_despliegue")
@@ -112,14 +119,14 @@ model RegistroDespliegue {
 // ============================================================
 
 model Metrica {
-  idMetrica         BigInt   @id @default(autoincrement()) @map("id_metrica")
-  consumoCpu        Decimal  @map("consumo_cpu") @db.Decimal(5, 2)
-  consumoMemoria    Int      @map("consumo_memoria")
-  estadoEjecucion   String   @map("estado_ejecucion") @db.VarChar(20)
-  marcaTiempo       DateTime @default(now()) @map("marca_tiempo")
-  idServicio        Int      @map("id_servicio")
+  idMetrica       BigInt   @id @default(autoincrement()) @map("id_metrica")
+  consumoCpu      Decimal  @map("consumo_cpu") @db.Decimal(5, 2)
+  consumoMemoria  Int      @map("consumo_memoria")
+  estadoEjecucion String   @map("estado_ejecucion") @db.VarChar(20)
+  marcaTiempo     DateTime @default(now()) @map("marca_tiempo")
+  idServicio      Int      @map("id_servicio")
 
-  servicio          Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
+  servicio Servicio @relation(fields: [idServicio], references: [idServicio], onDelete: Cascade)
 
   @@index([idServicio, marcaTiempo])
   @@map("metrica")
@@ -130,81 +137,81 @@ model Metrica {
 // ============================================================
 
 model RutaAprendizaje {
-  idRuta            Int       @id @default(autoincrement()) @map("id_ruta")
-  progreso          Decimal   @default(0) @db.Decimal(5, 2)
-  fechaAsignacion   DateTime  @default(now()) @map("fecha_asignacion")
-  idUsuario         Int       @map("id_usuario")
+  idRuta          Int      @id @default(autoincrement()) @map("id_ruta")
+  progreso        Decimal  @default(0) @db.Decimal(5, 2)
+  fechaAsignacion DateTime @default(now()) @map("fecha_asignacion")
+  idUsuario       Int      @map("id_usuario")
 
-  usuario           Usuario       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
-  rutaModulos       RutaModulo[]
+  usuario     Usuario      @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  rutaModulos RutaModulo[]
 
   @@map("ruta_aprendizaje")
 }
 
 model Modulo {
-  idModulo          Int       @id @default(autoincrement()) @map("id_modulo")
-  nombre            String    @db.VarChar(160)
-  contenidoTeorico  String    @map("contenido_teorico") @db.Text
-  orden             Int
+  idModulo         Int    @id @default(autoincrement()) @map("id_modulo")
+  nombre           String @db.VarChar(160)
+  contenidoTeorico String @map("contenido_teorico") @db.Text
+  orden            Int
 
-  rutaModulos       RutaModulo[]
-  actividades       Actividad[]
-  evaluacion        Evaluacion?
+  rutaModulos RutaModulo[]
+  actividades Actividad[]
+  evaluacion  Evaluacion?
 
   @@map("modulo")
 }
 
 model RutaModulo {
-  idRuta         Int   @map("id_ruta")
-  idModulo       Int   @map("id_modulo")
-  ordenSecuencia Int   @map("orden_secuencia")
+  idRuta         Int @map("id_ruta")
+  idModulo       Int @map("id_modulo")
+  ordenSecuencia Int @map("orden_secuencia")
 
-  ruta    RutaAprendizaje @relation(fields: [idRuta], references: [idRuta], onDelete: Cascade)
-  modulo  Modulo          @relation(fields: [idModulo], references: [idModulo], onDelete: Restrict)
+  ruta   RutaAprendizaje @relation(fields: [idRuta], references: [idRuta], onDelete: Cascade)
+  modulo Modulo          @relation(fields: [idModulo], references: [idModulo], onDelete: Restrict)
 
   @@id([idRuta, idModulo])
   @@map("ruta_modulo")
 }
 
 model Actividad {
-  idActividad           Int      @id @default(autoincrement()) @map("id_actividad")
-  descripcion           String   @db.Text
-  criteriosValidacion   Json     @map("criterios_validacion")
-  orden                 Int
-  idModulo              Int      @map("id_modulo")
+  idActividad         Int    @id @default(autoincrement()) @map("id_actividad")
+  descripcion         String @db.Text
+  criteriosValidacion Json   @map("criterios_validacion")
+  orden               Int
+  idModulo            Int    @map("id_modulo")
 
-  modulo                Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
-  resultados            Resultado[]
+  modulo     Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
+  resultados Resultado[]
 
   @@map("actividad")
 }
 
 model Evaluacion {
-  idEvaluacion      Int      @id @default(autoincrement()) @map("id_evaluacion")
-  titulo            String   @db.VarChar(200)
-  preguntas         Json
-  fechaDisponible   DateTime @map("fecha_disponible")
-  idModulo          Int      @unique @map("id_modulo")
+  idEvaluacion    Int      @id @default(autoincrement()) @map("id_evaluacion")
+  titulo          String   @db.VarChar(200)
+  preguntas       Json
+  fechaDisponible DateTime @map("fecha_disponible")
+  idModulo        Int      @unique @map("id_modulo")
 
-  modulo            Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
-  resultados        Resultado[]
+  modulo     Modulo      @relation(fields: [idModulo], references: [idModulo], onDelete: Cascade)
+  resultados Resultado[]
 
   @@map("evaluacion")
 }
 
 model Resultado {
-  idResultado         Int      @id @default(autoincrement()) @map("id_resultado")
-  puntuacion          Decimal  @db.Decimal(5, 2)
-  tiempoEmpleado      Int      @map("tiempo_empleado")
-  intentos            Int      @default(1)
-  fechaFinalizacion   DateTime @default(now()) @map("fecha_finalizacion")
-  idUsuario           Int      @map("id_usuario")
-  idEvaluacion        Int?     @map("id_evaluacion")
-  idActividad         Int?     @map("id_actividad")
+  idResultado       Int      @id @default(autoincrement()) @map("id_resultado")
+  puntuacion        Decimal  @db.Decimal(5, 2)
+  tiempoEmpleado    Int      @map("tiempo_empleado")
+  intentos          Int      @default(1)
+  fechaFinalizacion DateTime @default(now()) @map("fecha_finalizacion")
+  idUsuario         Int      @map("id_usuario")
+  idEvaluacion      Int?     @map("id_evaluacion")
+  idActividad       Int?     @map("id_actividad")
 
-  usuario             Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
-  evaluacion          Evaluacion? @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: SetNull)
-  actividad           Actividad?  @relation(fields: [idActividad], references: [idActividad], onDelete: SetNull)
+  usuario    Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  evaluacion Evaluacion? @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: SetNull)
+  actividad  Actividad?  @relation(fields: [idActividad], references: [idActividad], onDelete: SetNull)
 
   @@index([idUsuario, fechaFinalizacion])
   @@map("resultado")

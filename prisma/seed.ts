@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  const rolEstudiante = await prisma.rol.upsert({
+  await prisma.rol.upsert({
     where: { nombre: "estudiante" },
     update: {},
     create: {

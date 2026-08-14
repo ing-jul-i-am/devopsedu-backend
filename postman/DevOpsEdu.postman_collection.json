@@ -1,0 +1,423 @@
+{
+  "info": {
+    "_postman_id": "a5e6f7c8-0002-4b3c-9d4e-devopsedu0002",
+    "name": "DevOpsEdu Backend",
+    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10) e historico de metricas (RF-18).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios.\n4. Los requests de Login guardan el token automaticamente; el request de Crear servicio guarda el idServicio automaticamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar estudiante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 creado o 409 ya registrado (ejecuciones repetidas)', function () {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{nombreEstudiante}}\",\n  \"correo\": \"{{correoEstudiante}}\",\n  \"contrasena\": \"{{contrasenaEstudiante}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "registro"]
+            },
+            "description": "RF-01: auto-registro. El rol se asigna en el servidor (estudiante) y nunca se acepta desde el cliente."
+          }
+        },
+        {
+          "name": "Login estudiante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token y usuario', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('token');",
+                  "    pm.environment.set('tokenEstudiante', datos.token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoEstudiante}}\",\n  \"contrasena\": \"{{contrasenaEstudiante}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "RF-02: inicio de sesion. Guarda el token emitido en la variable de ambiente tokenEstudiante."
+          }
+        },
+        {
+          "name": "Login docente (admin semilla)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token y usuario docente', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('token');",
+                  "    pm.environment.set('tokenDocente', datos.token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoDocente}}\",\n  \"contrasena\": \"{{contrasenaDocente}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Usa el usuario docente creado por prisma/seed.ts. La contrasena depende de ADMIN_PASSWORD_INICIAL en el .env usado al sembrar la base (por defecto 'cambiar_en_primer_ingreso'). Ajustar la variable contrasenaDocente si difiere."
+          }
+        },
+        {
+          "name": "Logout estudiante",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "RF-03: revoca la sesion asociada al token (tabla sesion)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Servidor",
+      "item": [
+        {
+          "name": "Consultar capacidad",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servidor/capacidad",
+              "host": ["{{baseUrl}}"],
+              "path": ["servidor", "capacidad"]
+            },
+            "description": "RF-10 / CU-04: capacidad total, comprometida y disponible, medida en tiempo real sobre el sistema operativo (DT-06)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Servicios",
+      "item": [
+        {
+          "name": "Listar catalogo de imagenes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios/imagenes",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "imagenes"]
+            },
+            "description": "RF-07: catalogo curado de imagenes Docker sugeridas."
+          }
+        },
+        {
+          "name": "Crear servicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 servicio creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('idServicio');",
+                  "    pm.environment.set('idServicio', datos.idServicio);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Base de datos de practica\",\n  \"descripcion\": \"Servicio de demostracion para la sustentacion\",\n  \"configuracion\": {\n    \"imagenDocker\": \"postgres:16-alpine\",\n    \"cpuAsignado\": 0.5,\n    \"memoriaAsignada\": 256,\n    \"almacenamientoAsignado\": 1024,\n    \"puertos\": [\n      { \"host\": 55432, \"contenedor\": 5432, \"protocolo\": \"tcp\" }\n    ],\n    \"variablesEntorno\": {\n      \"POSTGRES_PASSWORD\": \"clave_de_prueba\"\n    },\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios"]
+            },
+            "description": "RF-05, RF-06: creacion de un servicio con su configuracion inicial. Guarda idServicio automaticamente para los siguientes requests."
+          }
+        },
+        {
+          "name": "Listar panel de servicios",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios"]
+            },
+            "description": "RF-16: panel de servicios del usuario autenticado."
+          }
+        },
+        {
+          "name": "Ver detalle de servicio",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}"]
+            },
+            "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue)."
+          }
+        },
+        {
+          "name": "Editar configuracion de servicio",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configuracion\": {\n    \"imagenDocker\": \"postgres:16-alpine\",\n    \"cpuAsignado\": 1,\n    \"memoriaAsignada\": 512,\n    \"almacenamientoAsignado\": 2048,\n    \"puertos\": [\n      { \"host\": 55432, \"contenedor\": 5432, \"protocolo\": \"tcp\" }\n    ],\n    \"variablesEntorno\": {\n      \"POSTGRES_PASSWORD\": \"clave_de_prueba\"\n    },\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}/configuracion",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}", "configuracion"]
+            },
+            "description": "RF-08: crea un nuevo registro de configuracion (historico 1:N, ver DT-04); no sobrescribe el anterior."
+          }
+        },
+        {
+          "name": "Desplegar servicio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}/desplegar",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}", "desplegar"]
+            },
+            "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend."
+          }
+        },
+        {
+          "name": "Consultar metricas del servicio",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}/metricas",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}", "metricas"],
+              "query": [
+                { "key": "desde", "value": "", "disabled": true },
+                { "key": "hasta", "value": "", "disabled": true }
+              ]
+            },
+            "description": "RF-18: historico de metricas de consumo (recolectadas por MonitorPeriodico mientras el servicio esta en_ejecucion). Admite filtro opcional por rango de fechas (desde/hasta)."
+          }
+        },
+        {
+          "name": "Detener servicio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}/detener",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}", "detener"]
+            },
+            "description": "RF-12: solo valido desde el estado en_ejecucion (maquina de estados 4.2.14)."
+          }
+        },
+        {
+          "name": "Reiniciar servicio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}/reiniciar",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}", "reiniciar"]
+            },
+            "description": "RF-13: valido desde detenido o en_ejecucion."
+          }
+        },
+        {
+          "name": "Eliminar servicio",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicio}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "{{idServicio}}"]
+            },
+            "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Casos de error (demo RNF-12 / RNF-14)",
+      "item": [
+        {
+          "name": "Login con credenciales invalidas -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoEstudiante}}\",\n  \"contrasena\": \"clave_incorrecta\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Debe responder 401 sin exponer si el correo existe (RNF-12)."
+          }
+        },
+        {
+          "name": "Crear servicio sin token -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Servicio sin autenticar\",\n  \"configuracion\": {\n    \"imagenDocker\": \"nginx:1.27-alpine\",\n    \"cpuAsignado\": 0.5,\n    \"memoriaAsignada\": 128,\n    \"almacenamientoAsignado\": 512,\n    \"puertos\": [],\n    \"variablesEntorno\": {},\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios"]
+            },
+            "description": "El middleware autenticar debe rechazar la peticion antes de llegar al controlador."
+          }
+        },
+        {
+          "name": "Crear servicio con datos invalidos -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"a\",\n  \"configuracion\": {\n    \"imagenDocker\": \"\",\n    \"cpuAsignado\": -1,\n    \"memoriaAsignada\": 0,\n    \"almacenamientoAsignado\": 0,\n    \"puertos\": [],\n    \"variablesEntorno\": {},\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios"]
+            },
+            "description": "El validador Zod (crearServicioSchema) rechaza el cuerpo antes de llegar al servicio de aplicacion."
+          }
+        },
+        {
+          "name": "Desplegar servicio inexistente -> 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{baseUrl}}/servicios/999999/desplegar",
+              "host": ["{{baseUrl}}"],
+              "path": ["servicios", "999999", "desplegar"]
+            },
+            "description": "ServicioNoEncontradoError -> 404."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" }
+  ]
+}

@@ -1,0 +1,193 @@
+# Decisiones tecnicas
+
+Este documento registra las decisiones tecnicas que no encajan directamente con un RF, RNF
+o CU del catalogo formal del diseño, o que se apartan de lo indicado en `CLAUDE.md`. Cada
+entrada se referencia desde el commit correspondiente con el identificador `DT-XX`.
+
+---
+
+## DT-01: Reconciliacion del alias "@/" en Vitest con los imports .js de NodeNext
+
+**Fecha:** 2026-07-24
+
+**Contexto:** El `CLAUDE.md` seccion 5 define el alias de Vitest como un unico mapeo de
+prefijo: `"@/": path.resolve(__dirname, "./src/")`. Al mismo tiempo, la seccion 6.3 exige
+`moduleResolution: NodeNext` y los skills (`ciclo-tdd`, `nuevo-endpoint`, etc.) escriben los
+imports con extension explicita `.js` (por ejemplo `@/infraestructura/configuracion.js`),
+que es obligatoria bajo NodeNext. Con el alias de prefijo, Vitest resuelve
+`@/infraestructura/configuracion.js` a la ruta literal `src/infraestructura/configuracion.js`,
+que no existe (el fuente es `.ts`), y falla la carga del modulo.
+
+**Decision:** Sustituir el alias de prefijo por un arreglo de dos reglas en `vitest.config.ts`:
+
+1. `find: /^@\/(.*)\.js$/` → `src/$1.ts`, que mapea los imports con extension `.js` al fuente `.ts`.
+2. `find: /^@\//` → `src/`, que cubre el resto de imports con prefijo `@/`.
+
+De esta forma se conservan tanto la convencion de imports `.js` que exigen NodeNext y los
+skills, como el alias `@/` documentado.
+
+**Consecuencias:** Los tests pueden importar el codigo de produccion con la misma sintaxis
+`.js` que usara el compilador `tsc`, sin divergencias entre entorno de pruebas y compilacion.
+La configuracion de alias es ligeramente mas verbosa que el snippet original del `CLAUDE.md`.
+
+**Alternativas consideradas:**
+- Usar `moduleResolution: Bundler` y omitir la extension `.js` en los imports. Descartada por
+  contradecir la seccion 6.3 del `CLAUDE.md` y la convencion de los skills.
+- Agregar el plugin `vite-tsconfig-paths`. Descartada para no introducir una dependencia nueva
+  sin justificacion de alcance (RNF-20).
+
+---
+
+## DT-02: Separacion de la configuracion de typecheck y de compilacion
+
+**Fecha:** 2026-07-25
+
+**Contexto:** El `CLAUDE.md` seccion 10 define `"build": "tsc"`. Para tener buena verificacion
+de tipos, `tsconfig.json` incluye `src`, `tests` y `scripts`. Con esa inclusion, `tsc` calcula
+la raiz comun del proyecto y emite preservando la estructura (`dist/src/index.js`), de modo que
+`"start": "node dist/index.js"` (tambien definido en el `CLAUDE.md`) no encuentra el archivo.
+
+**Decision:** Separar responsabilidades en dos configuraciones:
+
+- `tsconfig.json`: verificacion de tipos de todo el codigo (`src`, `tests`, `scripts`) con
+  `noEmit: true`. Lo usan el editor y `tsc --noEmit`.
+- `tsconfig.build.json`: compilacion de produccion con `rootDir: "src"`, `outDir: "dist"` e
+  `include` solo de `src`. El script pasa a `"build": "tsc -p tsconfig.build.json"`.
+
+Asi `dist/index.js` queda en la ruta que espera `npm start`, sin renunciar a la verificacion
+de tipos de las pruebas.
+
+**Consecuencias:** El script `build` deja de ser exactamente `tsc`, pero produce la estructura
+correcta. Los tests se siguen verificando con tipos mediante `tsconfig.json`.
+
+**Alternativas consideradas:**
+- Fijar `rootDir: "src"` e `include: ["src"]` en `tsconfig.json`. Descartada porque dejaria las
+  pruebas fuera de la verificacion de tipos de `tsc`.
+- Mover las pruebas dentro de `src`. Descartada por contradecir la estructura de carpetas del
+  `CLAUDE.md` seccion 4.
+
+---
+
+## DT-03: RF-04 es un requerimiento transversal de autorizacion, no un endpoint de /api/usuarios
+
+**Fecha:** 2026-07-25
+
+**Contexto:** La tabla de la seccion 8 del `CLAUDE.md` agrupa RF-04 bajo el recurso
+`/api/usuarios`. Sin embargo, el texto del catalogo (seccion 4.2.6.1.1 del diseño) define
+RF-04 como "Gestion de perfiles diferenciados": el sistema debe diferenciar las
+funcionalidades segun el rol, restringiendo las operaciones administrativas al perfil docente,
+y registrar en la bitacora los intentos denegados. Su criterio de aceptacion se refiere a que
+un estudiante no pueda crear ni modificar modulos educativos.
+
+**Decision:** RF-04 no se implementa como un recurso REST propio (`/api/usuarios`). Se
+satisface con el mecanismo de autorizacion transversal:
+
+- Middleware `autenticar` (valida el JWT y la vigencia de la sesion).
+- Middleware `autorizar(...roles)` (restringe por rol y registra el acceso no autorizado).
+- Traduccion de `PermisoDenegadoError` a HTTP 403 con registro en bitacora (RNF-14).
+
+El punto de aplicacion concreto del criterio de aceptacion (bloquear al estudiante en la
+creacion/modificacion de modulos) y su verificacion de integracion viven en la Etapa 6
+(`/api/modulos`), donde esas rutas se protegen con `autorizar("docente")`.
+
+**Consecuencias:** No se agrega un endpoint `/api/usuarios` especulativo. La Etapa 2 queda
+completa en cuanto al mecanismo (RF-01, RF-02, RF-03, RF-04, RNF-10, RNF-12, RNF-14, RNF-21);
+la prueba de aceptacion end-to-end de RF-04 se redacta al construir los endpoints de modulos.
+
+**Alternativas consideradas:**
+- Crear `GET /api/usuarios/yo` o `GET /api/usuarios`. Descartadas por no ser requeridas por
+  RF-04 ni por ningun otro RF del catalogo en esta etapa (evita alcance especulativo).
+
+---
+
+## DT-04: ConfiguracionServicio pasa a 1:N (historico de configuraciones) para cumplir RF-08
+
+**Fecha:** 2026-07-25
+
+**Contexto:** El documento de diseño es internamente inconsistente sobre la cardinalidad entre
+`Servicio` y `ConfiguracionServicio`:
+
+- RF-08 ("Edicion de configuracion de servicio") exige modificar la configuracion "generando un
+  nuevo registro de configuracion asociado al mismo servicio", y su criterio de aceptacion pide
+  que la modificacion "quede registrada en el historico de configuraciones". Esto implica 1:N.
+- El modelo de clases (seccion 4.2.16) menciona "sus ConfiguracionServicio ... asociadas" en
+  plural y como composicion, lo que tambien sugiere 1:N.
+- El diagrama entidad-relacion (seccion 4.2.17) declara la relacion como 1:1 mediante un UNIQUE
+  sobre `id_servicio`, "cada servicio mantenga exactamente una configuracion vigente".
+
+El esquema Prisma inicial seguia el ER (1:1), lo que hace imposible cumplir el criterio de
+aceptacion de RF-08.
+
+**Decision:** Con aprobacion del autor del proyecto, se adopta el modelo 1:N para cumplir RF-08:
+
+- Se elimina el UNIQUE sobre `id_servicio` en `configuracion_servicio`.
+- Se agrega `fecha_creacion` a `configuracion_servicio` y un indice `(id_servicio, fecha_creacion)`.
+- La configuracion vigente de un servicio es la mas reciente (desempate por `id_configuracion`).
+- Editar la configuracion (RF-08) inserta un nuevo registro; no actualiza el existente.
+
+Migracion: `20260725080415_agrega_historico_configuracion_servicio`.
+
+**Consecuencias:** Se cumple RF-08 y el modelo de clases (plural). Se aparta del ER 1:1 del
+documento; el diagrama ER debe actualizarse a 1:N en la proxima revision del diseño para
+mantener la coherencia documental.
+
+**Alternativas consideradas:**
+- Mantener 1:1 y editar en sitio. Descartada porque incumple el criterio de aceptacion de RF-08
+  (no habria historico de configuraciones).
+
+---
+
+## DT-05: registro_despliegue incorpora el campo 'operacion' para cumplir RF-15
+
+**Fecha:** 2026-07-25
+
+**Contexto:** RF-15 exige "registrar cada operacion de despliegue, detencion, reinicio o
+eliminacion, incluyendo usuario, fecha y resultado", y RF-17 habla del "historico de
+operaciones". Sin embargo, la entidad `RegistroDespliegue` del diagrama ER (seccion 4.2.17) solo
+contempla `fecha_hora`, `resultado`, `mensaje_error`, `id_servicio` e `id_usuario`, sin un campo
+que identifique el tipo de operacion. Con ese modelo no es posible distinguir en el historico si
+un registro corresponde a un despliegue, una detencion, un reinicio o una eliminacion.
+
+**Decision:** Con aprobacion del autor, se agrega la columna `operacion` (VarChar 20) a
+`registro_despliegue`. Valores esperados: `desplegar`, `detener`, `reiniciar`, `eliminar`.
+
+Migracion: `agrega_operacion_registro_despliegue`.
+
+**Consecuencias:** Se cumple RF-15 y el historico de RF-17 distingue el tipo de operacion. Se
+aparta del ER; el diagrama debe actualizarse para incluir el campo en la proxima revision.
+
+**Alternativas consideradas:**
+- Registrar solo `resultado` (como el ER y el skill integracion-docker). Descartada porque deja
+  RF-15/RF-17 incompletos (el historico no distinguiria el tipo de operacion).
+
+---
+
+## DT-06: la verificacion de recursos mide la disponibilidad real del sistema operativo
+
+**Fecha:** 2026-07-25
+
+**Contexto:** El flujo CU-04 del diseno calcula los recursos disponibles como la capacidad total
+del servidor menos "el consumo actual de los contenedores activos" consultado a Docker. Ese
+modelo no descuenta el uso del propio sistema operativo ni de otros programas ajenos a la
+plataforma, por lo que sobreestima lo realmente disponible en la maquina.
+
+**Decision:** Con aprobacion del autor, el `VerificadorRecursos` mide la disponibilidad
+directamente del sistema operativo:
+
+- Memoria: `os.freemem()` (RAM libre real; incluye el uso del SO, otros programas y Docker).
+- Disco: `fs.statfs(ruta)` (espacio libre real del sistema de archivos).
+- CPU: `os.cpus().length` menos `os.loadavg()[0]` (demanda promedio del sistema).
+
+Asi, lo disponible refleja el estado real de la maquina y `comprometido = total - disponible`
+contempla todo el consumo. La medicion se inyecta como dependencia para que las pruebas sean
+deterministas (no dependan del estado real del equipo). Se elimino
+`ServicioRepo.sumarRecursosVigentes`, que quedo sin uso.
+
+**Consecuencias:** La verificacion es realista respecto a la maquina completa. El resultado
+fluctua con el uso del equipo y la parte de CPU es una aproximacion por carga. Se aparta de la
+redaccion literal de CU-04 (que solo descuenta contenedores Docker); el diseno deberia
+actualizarse en consecuencia.
+
+**Alternativas consideradas:**
+- Restar solo el consumo/reserva de los contenedores Docker (fiel a CU-04). Descartada porque no
+  toma en cuenta el uso del SO ni de otros programas, como observo el autor.
