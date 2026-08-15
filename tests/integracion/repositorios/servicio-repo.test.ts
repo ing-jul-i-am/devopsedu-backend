@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/servicio-repo.test.ts
 // Pruebas de integracion del repositorio de servicios contra la base de pruebas.
-// Cubre: RF-05, RF-08
+// Cubre: RF-05, RF-08, RF-19
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { ServicioRepo } from "@/repositorios/servicio-repo.js";
@@ -223,6 +223,32 @@ describe("ServicioRepo", () => {
       // Assert
       expect(enEjecucion).toHaveLength(1);
       expect(enEjecucion[0]?.nombre).toBe("a");
+    });
+  });
+
+  describe("listarDetenidos", () => {
+    it("devuelve solo los servicios en estado detenido, de cualquier usuario", async () => {
+      // Arrange
+      const usuario1 = await crearUsuarioEnBd();
+      const usuario2 = await crearUsuarioEnBd();
+      const a = await repo.crearConConfiguracion({
+        idUsuario: usuario1.idUsuario,
+        nombre: "a",
+        configuracion: configValida(),
+      });
+      await repo.actualizarEstado(a.idServicio, "detenido");
+      await repo.crearConConfiguracion({
+        idUsuario: usuario2.idUsuario,
+        nombre: "b",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const detenidos = await repo.listarDetenidos();
+
+      // Assert
+      expect(detenidos).toHaveLength(1);
+      expect(detenidos[0]?.nombre).toBe("a");
     });
   });
 });

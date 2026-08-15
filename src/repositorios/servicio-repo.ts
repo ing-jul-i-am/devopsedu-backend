@@ -1,7 +1,7 @@
 // src/repositorios/servicio-repo.ts
 // Repositorio de acceso a datos para servicios y su historico de configuraciones.
 // La configuracion vigente de un servicio es la mas reciente (RF-08, ver DT-04).
-// Cubre: RF-05, RF-08
+// Cubre: RF-05, RF-08, RF-19
 
 import type {
   PrismaClient,
@@ -83,6 +83,14 @@ export class ServicioRepo {
   async listarEnEjecucion(): Promise<Servicio[]> {
     return this.prisma.servicio.findMany({
       where: { estado: "en_ejecucion" },
+    });
+  }
+
+  // Servicios detenidos de todos los usuarios. El monitor periodico los revisa para detectar
+  // contenedores iniciados fuera de la plataforma y resincronizar el estado (RF-19).
+  async listarDetenidos(): Promise<Servicio[]> {
+    return this.prisma.servicio.findMany({
+      where: { estado: "detenido" },
     });
   }
 

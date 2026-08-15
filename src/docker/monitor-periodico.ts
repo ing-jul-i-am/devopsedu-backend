@@ -4,7 +4,9 @@
 // stats de Docker no falla para un contenedor detenido, asi que confiar solo en ella deja sin
 // detectar los casos en que el contenedor se detuvo fuera de la plataforma (por terminal, por
 // error interno, etc). Si el contenedor no esta en ejecucion o falla la lectura, marca el
-// servicio como fallido y registra el incidente (RF-19). Frecuencia por defecto: 5 s (RNF-09).
+// servicio como fallido y registra el incidente (RF-19). Tambien revisa los servicios
+// detenidos: si su contenedor aparece corriendo (se inicio fuera de la plataforma), resincroniza
+// el estado a en_ejecucion. Frecuencia por defecto: 5 s (RNF-09).
 // Cubre: RF-16, RF-18, RF-19, RNF-09
 
 import type { ServicioRepo } from "../repositorios/servicio-repo.js";
@@ -20,7 +22,10 @@ import { logger } from "../infraestructura/logger.js";
 const INTERVALO_POR_DEFECTO_MS = 5000;
 
 export interface DependenciasMonitor {
-  servicioRepo: Pick<ServicioRepo, "listarEnEjecucion" | "actualizarEstado">;
+  servicioRepo: Pick<
+    ServicioRepo,
+    "listarEnEjecucion" | "listarDetenidos" | "actualizarEstado"
+  >;
   metricaRepo: Pick<MetricaRepo, "registrarLote">;
   registroRepo: Pick<RegistroDespliegueRepo, "registrar">;
   intervaloMs?: number;
@@ -90,6 +95,41 @@ export class MonitorPeriodico {
 
     if (metricas.length > 0) {
       await this.dep.metricaRepo.registrarLote(metricas);
+    }
+
+    await this.sincronizarDetenidos();
+  }
+
+  private async sincronizarDetenidos(): Promise<void> {
+    const detenidos = await this.dep.servicioRepo.listarDetenidos();
+
+    for (const servicio of detenidos) {
+      const nombre = nombreContenedor(servicio.idServicio, servicio.nombre);
+      let estadoContenedor;
+      try {
+        estadoContenedor = await obtenerEstadoContenedor(nombre);
+      } catch {
+        continue;
+      }
+      if (!estadoContenedor.enEjecucion) {
+        continue;
+      }
+
+      // RF-19: el contenedor se inicio fuera de la plataforma -> resincronizar el estado.
+      logger.warn({
+        evento: "servicio_iniciado_fuera_de_plataforma",
+        idServicio: servicio.idServicio,
+      });
+      await this.dep.servicioRepo.actualizarEstado(
+        servicio.idServicio,
+        "en_ejecucion"
+      );
+      await this.dep.registroRepo.registrar({
+        idServicio: servicio.idServicio,
+        idUsuario: servicio.idUsuario,
+        operacion: "monitorear",
+        resultado: "exito",
+      });
     }
   }
 }
