@@ -317,7 +317,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["servicios", "{{idServicio}}", "reiniciar"]
             },
-            "description": "RF-13: valido desde detenido o en_ejecucion."
+            "description": "RF-13: valido desde detenido, en_ejecucion o fallido (RF-19: permite recuperar un servicio marcado fallido cuyo contenedor sigue existiendo, por ejemplo tras detectarse que se detuvo fuera de la plataforma)."
           }
         },
         {

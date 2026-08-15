@@ -4,6 +4,13 @@ Estado del backend a partir del cual se genera este contrato: rama `segunda-sema
 commit `04f88c2` ("feat(servicios): verificacion de recursos basada en disponibilidad
 real del SO (RF-09, RF-10, DT-06)").
 
+**Actualizaciones posteriores** (rama `cuarta-semana`, commits `c29e55a` y `c08d2b8`,
+RF-19): el `MonitorPeriodico` ahora detecta contenedores detenidos fuera de la
+plataforma (por ejemplo, `docker stop` desde la terminal) y marca el servicio como
+`fallido`; y `reiniciar` (3.9) acepta `fallido` como estado de origen para poder
+recuperar esos servicios. Ver detalle en 3.6 y 3.9. El resto del documento no ha sido
+re-auditado desde el commit base.
+
 Este documento describe **unicamente los endpoints ya implementados**. Los grupos
 `/api/aprendizaje`, `/api/modulos`, `/api/rutas` y `/api/reportes` (etapa 6-7, RF-20 a
 RF-26) todavia no existen en el backend y no deben asumirse disponibles por el
@@ -327,8 +334,16 @@ RF-17: detalle del servicio con su historico de operaciones de despliegue.
 ```
 
 `registros` es el arreglo crudo de `RegistroDespliegue` de Prisma (sin transformar):
-`operacion` es una de `desplegar | detener | reiniciar | eliminar`; `resultado` es
-`exito | fallo`; `mensajeError` es `string | null`.
+`operacion` es una de `desplegar | detener | reiniciar | eliminar | monitorear`;
+`resultado` es `exito | fallo`; `mensajeError` es `string | null`.
+
+`monitorear` no la origina una peticion del usuario: la genera automaticamente
+`MonitorPeriodico` (RF-19) cuando, en su barrido cada 5 s, detecta que un servicio
+marcado `en_ejecucion` en la base de datos ya no esta corriendo en Docker (se detuvo
+fuera de la plataforma, crasheo, o el contenedor fue removido). Siempre aparece con
+`resultado: "fallo"` y dispara ademas el cambio de `estado` del servicio a `fallido`;
+`idUsuario` en ese registro es el dueno del servicio, no un usuario que ejecuto la
+accion.
 
 **Errores posibles**: `401`, `403`, `404` (`ServicioNoEncontradoError` — no existe o no
 pertenece al usuario).
@@ -391,12 +406,22 @@ RF-11 a RF-14 — CU-05. Ninguna de estas rutas recibe cuerpo. Todas responden
 | --- | --- | --- | --- |
 | `POST /api/servicios/:idServicio/desplegar` | RF-11 | `configurado`, `detenido`, `fallido` | `en_ejecucion` |
 | `POST /api/servicios/:idServicio/detener` | RF-12 | `en_ejecucion` | `detenido` |
-| `POST /api/servicios/:idServicio/reiniciar` | RF-13 | `detenido`, `en_ejecucion` | `en_ejecucion` |
+| `POST /api/servicios/:idServicio/reiniciar` | RF-13 | `detenido`, `en_ejecucion`, `fallido` | `en_ejecucion` |
 | `DELETE /api/servicios/:idServicio` | RF-14 | `configurado`, `desplegando`, `en_ejecucion`, `detenido`, `reiniciando`, `fallido` | `eliminado` (eliminacion logica; el registro se conserva) |
 
 `desplegar` ademas verifica disponibilidad de recursos (RF-09) antes de invocar a
 Docker; si la operacion Docker falla, el servicio queda en `fallido` y el error
 original se propaga al cliente (no se enmascara).
+
+`reiniciar` acepta `fallido` como origen (RF-19) porque el contenedor Docker
+subyacente puede seguir existiendo aunque el servicio haya quedado `fallido` — por
+ejemplo, si `MonitorPeriodico` lo marco asi tras detectar que se detuvo fuera de la
+plataforma (ver 3.6). En ese caso `reiniciar` equivale a un `docker start`/`docker
+restart` sobre el contenedor existente. Nota: `desplegar` tambien permite origen
+`fallido`, pero solo tiene sentido si el contenedor nunca llego a crearse (intentar
+crear uno con el mismo nombre determinístico responde `409
+NombreContenedorEnUsoError` si ya existe); para el caso de un contenedor detenido que
+sobrevive, usar `reiniciar`, no `desplegar`.
 
 **Errores posibles (comunes a las cuatro operaciones)**
 
