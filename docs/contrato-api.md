@@ -4,12 +4,17 @@ Estado del backend a partir del cual se genera este contrato: rama `segunda-sema
 commit `04f88c2` ("feat(servicios): verificacion de recursos basada en disponibilidad
 real del SO (RF-09, RF-10, DT-06)").
 
-**Actualizaciones posteriores** (rama `cuarta-semana`, commits `c29e55a` y `c08d2b8`,
-RF-19): el `MonitorPeriodico` ahora detecta contenedores detenidos fuera de la
-plataforma (por ejemplo, `docker stop` desde la terminal) y marca el servicio como
-`fallido`; y `reiniciar` (3.9) acepta `fallido` como estado de origen para poder
-recuperar esos servicios. Ver detalle en 3.6 y 3.9. El resto del documento no ha sido
-re-auditado desde el commit base.
+**Actualizaciones posteriores** (rama `cuarta-semana`, RF-19): el `MonitorPeriodico`
+detecta en ambas direcciones cuando el estado real de Docker diverge del estado en
+base de datos y resincroniza automaticamente (ver 3.6):
+
+- commits `c29e55a` / `c08d2b8`: contenedores detenidos fuera de la plataforma se
+  marcan `fallido`, y `reiniciar` (3.9) acepta `fallido` como estado de origen para
+  recuperarlos.
+- commit `412b900`: servicios `detenido` cuyo contenedor se inicio fuera de la
+  plataforma se resincronizan a `en_ejecucion`.
+
+El resto del documento no ha sido re-auditado desde el commit base.
 
 Este documento describe **unicamente los endpoints ya implementados**. Los grupos
 `/api/aprendizaje`, `/api/modulos`, `/api/rutas` y `/api/reportes` (etapa 6-7, RF-20 a
@@ -338,12 +343,19 @@ RF-17: detalle del servicio con su historico de operaciones de despliegue.
 `resultado` es `exito | fallo`; `mensajeError` es `string | null`.
 
 `monitorear` no la origina una peticion del usuario: la genera automaticamente
-`MonitorPeriodico` (RF-19) cuando, en su barrido cada 5 s, detecta que un servicio
-marcado `en_ejecucion` en la base de datos ya no esta corriendo en Docker (se detuvo
-fuera de la plataforma, crasheo, o el contenedor fue removido). Siempre aparece con
-`resultado: "fallo"` y dispara ademas el cambio de `estado` del servicio a `fallido`;
-`idUsuario` en ese registro es el dueno del servicio, no un usuario que ejecuto la
-accion.
+`MonitorPeriodico` (RF-19) en su barrido cada 5 s, en dos escenarios:
+
+- Un servicio marcado `en_ejecucion` en la base de datos ya no esta corriendo en
+  Docker (se detuvo fuera de la plataforma, crasheo, o el contenedor fue removido):
+  `resultado: "fallo"`, `mensajeError` describe el motivo, y el `estado` del servicio
+  cambia a `fallido`.
+- Un servicio marcado `detenido` en la base de datos aparece corriendo en Docker
+  (se inicio fuera de la plataforma, por ejemplo con `docker start` desde la
+  terminal): `resultado: "exito"`, sin `mensajeError`, y el `estado` del servicio
+  cambia a `en_ejecucion`.
+
+En ambos casos `idUsuario` en ese registro es el dueno del servicio, no un usuario
+que ejecuto la accion.
 
 **Errores posibles**: `401`, `403`, `404` (`ServicioNoEncontradoError` — no existe o no
 pertenece al usuario).
