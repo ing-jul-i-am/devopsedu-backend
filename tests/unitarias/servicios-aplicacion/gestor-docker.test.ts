@@ -1,7 +1,7 @@
 // tests/unitarias/servicios-aplicacion/gestor-docker.test.ts
 // Pruebas unitarias del GestorDocker: orquesta cliente-docker, repositorios y transiciones de
 // estado. Se mockea cliente-docker (no dockerode) y los repositorios.
-// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15 — CU-05
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19 — CU-05
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -248,6 +248,27 @@ describe("GestorDocker", () => {
       expect(dep.servicioRepo.actualizarEstado).toHaveBeenCalledWith(1, "fallido");
       expect(dep.registroRepo.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ operacion: "reiniciar", resultado: "fallo" })
+      );
+    });
+
+    it("permite reiniciar un servicio en estado fallido (RF-19: recuperar un contenedor detenido fuera de la plataforma)", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "fallido" })
+      );
+      vi.mocked(clienteDocker.reiniciarContenedor).mockResolvedValue(undefined);
+
+      await crearGestor(dep).reiniciar(5, 1);
+
+      expect(clienteDocker.reiniciarContenedor).toHaveBeenCalledWith(
+        "devopsedu-1-svc"
+      );
+      expect(dep.servicioRepo.actualizarEstado).toHaveBeenCalledWith(
+        1,
+        "en_ejecucion"
+      );
+      expect(dep.registroRepo.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ operacion: "reiniciar", resultado: "exito" })
       );
     });
   });

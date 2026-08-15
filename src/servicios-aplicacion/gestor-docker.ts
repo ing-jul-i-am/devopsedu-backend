@@ -2,7 +2,9 @@
 // Servicio de aplicacion que concentra las operaciones sobre el motor Docker: desplegar,
 // detener, reiniciar y eliminar. Aplica las transiciones de la maquina de estados (4.2.14),
 // deja huella de cada operacion (RF-15) y verifica recursos antes de desplegar (RF-09/CU-04).
-// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15 — CU-05
+// Permite reiniciar un servicio en estado fallido: el contenedor puede seguir existiendo aunque
+// el monitor lo haya marcado fallido por detenerse fuera de la plataforma (RF-19).
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19 — CU-05
 
 import type { Servicio } from "@prisma/client";
 import type {
@@ -29,7 +31,10 @@ import { ContenedorNoEncontradoError } from "../dominio/errores/contenedor-no-en
 const ORIGENES_VALIDOS: Record<string, string[]> = {
   desplegar: ["configurado", "detenido", "fallido"],
   detener: ["en_ejecucion"],
-  reiniciar: ["detenido", "en_ejecucion"],
+  // "fallido" se incluye porque el contenedor puede seguir existiendo aunque se haya detenido
+  // fuera de la plataforma (RF-19); reiniciarContenedor funciona igual que "docker start" sobre
+  // un contenedor detenido, sin necesidad de volver a crearlo.
+  reiniciar: ["detenido", "en_ejecucion", "fallido"],
   eliminar: [
     "configurado",
     "desplegando",
