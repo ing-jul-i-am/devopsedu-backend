@@ -1,13 +1,20 @@
 // src/docker/monitor-periodico.ts
 // Proceso periodico que recolecta las metricas de consumo de los servicios en ejecucion y las
-// almacena por lote. Si la lectura de un contenedor falla, marca el servicio como fallido y
-// registra el incidente (RF-19). Frecuencia por defecto: 5 s (RNF-09).
+// almacena por lote. Antes de leer metricas, verifica el estado real del contenedor: la API de
+// stats de Docker no falla para un contenedor detenido, asi que confiar solo en ella deja sin
+// detectar los casos en que el contenedor se detuvo fuera de la plataforma (por terminal, por
+// error interno, etc). Si el contenedor no esta en ejecucion o falla la lectura, marca el
+// servicio como fallido y registra el incidente (RF-19). Frecuencia por defecto: 5 s (RNF-09).
 // Cubre: RF-16, RF-18, RF-19, RNF-09
 
 import type { ServicioRepo } from "../repositorios/servicio-repo.js";
 import type { MetricaRepo, DatosMetrica } from "../repositorios/metrica-repo.js";
 import type { RegistroDespliegueRepo } from "../repositorios/registro-despliegue-repo.js";
-import { obtenerEstadisticas, nombreContenedor } from "./cliente-docker.js";
+import {
+  obtenerEstadisticas,
+  obtenerEstadoContenedor,
+  nombreContenedor,
+} from "./cliente-docker.js";
 import { logger } from "../infraestructura/logger.js";
 
 const INTERVALO_POR_DEFECTO_MS = 5000;
@@ -48,6 +55,12 @@ export class MonitorPeriodico {
     for (const servicio of servicios) {
       const nombre = nombreContenedor(servicio.idServicio, servicio.nombre);
       try {
+        const estadoContenedor = await obtenerEstadoContenedor(nombre);
+        if (!estadoContenedor.enEjecucion) {
+          throw new Error(
+            `El contenedor se detuvo fuera de la plataforma (estado: ${estadoContenedor.estado})`
+          );
+        }
         const consumo = await obtenerEstadisticas(nombre);
         metricas.push({
           idServicio: servicio.idServicio,

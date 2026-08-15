@@ -9,6 +9,7 @@ vi.mock("@/docker/cliente-docker.js", () => ({
   nombreContenedor: (idServicio: number, nombre: string) =>
     `devopsedu-${idServicio}-${nombre}`,
   obtenerEstadisticas: vi.fn(),
+  obtenerEstadoContenedor: vi.fn(),
 }));
 
 import * as clienteDocker from "@/docker/cliente-docker.js";
@@ -41,6 +42,10 @@ describe("MonitorPeriodico", () => {
     dep.servicioRepo.listarEnEjecucion.mockResolvedValue([
       { idServicio: 1, idUsuario: 5, nombre: "svc" },
     ]);
+    vi.mocked(clienteDocker.obtenerEstadoContenedor).mockResolvedValue({
+      enEjecucion: true,
+      estado: "running",
+    });
     vi.mocked(clienteDocker.obtenerEstadisticas).mockResolvedValue({
       cpu: 12.5,
       memoria: 128,
@@ -52,6 +57,9 @@ describe("MonitorPeriodico", () => {
     await vi.advanceTimersByTimeAsync(5000);
 
     // Assert
+    expect(clienteDocker.obtenerEstadoContenedor).toHaveBeenCalledWith(
+      "devopsedu-1-svc"
+    );
     expect(clienteDocker.obtenerEstadisticas).toHaveBeenCalledWith(
       "devopsedu-1-svc"
     );
@@ -76,6 +84,10 @@ describe("MonitorPeriodico", () => {
     dep.servicioRepo.listarEnEjecucion.mockResolvedValue([
       { idServicio: 1, idUsuario: 5, nombre: "svc" },
     ]);
+    vi.mocked(clienteDocker.obtenerEstadoContenedor).mockResolvedValue({
+      enEjecucion: true,
+      estado: "running",
+    });
     vi.mocked(clienteDocker.obtenerEstadisticas).mockRejectedValue(
       new Error("contenedor caido")
     );
@@ -92,12 +104,40 @@ describe("MonitorPeriodico", () => {
     expect(dep.metricaRepo.registrarLote).not.toHaveBeenCalled();
   });
 
+  it("marca el servicio como fallido cuando el contenedor se detuvo fuera de la plataforma (RF-19)", async () => {
+    // Arrange
+    const dep = crearDeps();
+    dep.servicioRepo.listarEnEjecucion.mockResolvedValue([
+      { idServicio: 1, idUsuario: 5, nombre: "svc" },
+    ]);
+    vi.mocked(clienteDocker.obtenerEstadoContenedor).mockResolvedValue({
+      enEjecucion: false,
+      estado: "exited",
+    });
+    const monitor = new MonitorPeriodico(dep as never);
+
+    // Act
+    await monitor.recolectar();
+
+    // Assert
+    expect(clienteDocker.obtenerEstadisticas).not.toHaveBeenCalled();
+    expect(dep.servicioRepo.actualizarEstado).toHaveBeenCalledWith(1, "fallido");
+    expect(dep.registroRepo.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ resultado: "fallo", idServicio: 1 })
+    );
+    expect(dep.metricaRepo.registrarLote).not.toHaveBeenCalled();
+  });
+
   it("detener() detiene la recoleccion", async () => {
     // Arrange
     const dep = crearDeps();
     dep.servicioRepo.listarEnEjecucion.mockResolvedValue([
       { idServicio: 1, idUsuario: 5, nombre: "svc" },
     ]);
+    vi.mocked(clienteDocker.obtenerEstadoContenedor).mockResolvedValue({
+      enEjecucion: true,
+      estado: "running",
+    });
     vi.mocked(clienteDocker.obtenerEstadisticas).mockResolvedValue({
       cpu: 1,
       memoria: 1,

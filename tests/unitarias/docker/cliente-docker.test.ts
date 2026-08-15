@@ -1,7 +1,7 @@
 // tests/unitarias/docker/cliente-docker.test.ts
 // Pruebas unitarias del wrapper de Dockerode: traduccion de errores, mapeo de parametros y
 // calculo de consumo. Se mockea el modulo dockerode (no se toca el motor real).
-// Cubre: RF-11, RF-12, RF-13, RF-14, RNF-13
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-19, RNF-13
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -13,6 +13,7 @@ const { dockerMock, contenedorMock } = vi.hoisted(() => {
     restart: vi.fn(),
     remove: vi.fn(),
     stats: vi.fn(),
+    inspect: vi.fn(),
   };
   const dockerMock = {
     createContainer: vi.fn(),
@@ -29,6 +30,7 @@ import {
   reiniciarContenedor,
   eliminarContenedor,
   obtenerEstadisticas,
+  obtenerEstadoContenedor,
   nombreContenedor,
 } from "@/docker/cliente-docker.js";
 import { ImagenDockerNoDisponibleError } from "@/dominio/errores/imagen-docker-no-disponible-error.js";
@@ -163,6 +165,44 @@ describe("cliente-docker", () => {
       // Assert
       expect(consumo.cpu).toBeCloseTo(50);
       expect(consumo.memoria).toBe(256);
+    });
+  });
+
+  describe("obtenerEstadoContenedor", () => {
+    it("indica que esta en ejecucion cuando State.Running es true", async () => {
+      // Arrange
+      contenedorMock.inspect.mockResolvedValue({
+        State: { Running: true, Status: "running" },
+      });
+
+      // Act
+      const estado = await obtenerEstadoContenedor("x");
+
+      // Assert
+      expect(estado).toEqual({ enEjecucion: true, estado: "running" });
+    });
+
+    it("indica que no esta en ejecucion cuando el contenedor se detuvo fuera de la plataforma", async () => {
+      // Arrange
+      contenedorMock.inspect.mockResolvedValue({
+        State: { Running: false, Status: "exited" },
+      });
+
+      // Act
+      const estado = await obtenerEstadoContenedor("x");
+
+      // Assert
+      expect(estado).toEqual({ enEjecucion: false, estado: "exited" });
+    });
+
+    it("traduce un error 404 a ContenedorNoEncontradoError", async () => {
+      // Arrange
+      contenedorMock.inspect.mockRejectedValue({ statusCode: 404 });
+
+      // Act / Assert
+      await expect(obtenerEstadoContenedor("x")).rejects.toBeInstanceOf(
+        ContenedorNoEncontradoError
+      );
     });
   });
 });

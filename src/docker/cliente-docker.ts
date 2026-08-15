@@ -2,7 +2,7 @@
 // Wrapper unico sobre Dockerode (capa de servicios). Toda operacion sobre el motor Docker pasa
 // por aqui: usa parametros estructurados (nunca concatenacion, RNF-13) y traduce los errores de
 // la libreria a errores de dominio. Las capas superiores mockean este modulo, no dockerode.
-// Cubre: RF-11, RF-12, RF-13, RF-14, RNF-13
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-19, RNF-13
 
 import Docker from "dockerode";
 import { logger } from "../infraestructura/logger.js";
@@ -29,6 +29,11 @@ export interface ParametrosContenedor {
 export interface ConsumoContenedor {
   cpu: number; // porcentaje
   memoria: number; // MB
+}
+
+export interface EstadoContenedor {
+  enEjecucion: boolean;
+  estado: string;
 }
 
 // Nombre de contenedor deterministico y reproducible a partir del servicio (RNF-13). Evita
@@ -90,6 +95,23 @@ export async function obtenerEstadisticas(
   try {
     const stats = await docker.getContainer(idOnombre).stats({ stream: false });
     return calcularConsumo(stats);
+  } catch (error) {
+    throw traducirErrorOperacion(error);
+  }
+}
+
+// El estado reportado por Docker es la unica fuente confiable: la API de stats responde 200
+// con valores en cero incluso para un contenedor detenido, por lo que no sirve para detectar
+// que se detuvo fuera de la plataforma (RF-19).
+export async function obtenerEstadoContenedor(
+  idOnombre: string
+): Promise<EstadoContenedor> {
+  try {
+    const inspeccion = await docker.getContainer(idOnombre).inspect();
+    return {
+      enEjecucion: inspeccion.State.Running,
+      estado: inspeccion.State.Status,
+    };
   } catch (error) {
     throw traducirErrorOperacion(error);
   }
