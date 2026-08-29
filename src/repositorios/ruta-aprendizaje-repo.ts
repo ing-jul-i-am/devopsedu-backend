@@ -1,11 +1,20 @@
 // src/repositorios/ruta-aprendizaje-repo.ts
 // Repositorio de acceso a datos para las rutas de aprendizaje asignadas a un estudiante.
-// Cubre: RF-21
+// Cubre: RF-21, RF-22
 
-import type { PrismaClient, RutaAprendizaje, RutaModulo } from "@prisma/client";
+import type {
+  PrismaClient,
+  RutaAprendizaje,
+  RutaModulo,
+  Modulo,
+} from "@prisma/client";
 
 export type RutaAprendizajeConModulos = RutaAprendizaje & {
   rutaModulos: RutaModulo[];
+};
+
+export type RutaAprendizajeConModulosDetalle = RutaAprendizaje & {
+  rutaModulos: Array<RutaModulo & { modulo: Modulo }>;
 };
 
 export class RutaAprendizajeRepo {
@@ -27,6 +36,23 @@ export class RutaAprendizajeRepo {
         },
       },
       include: { rutaModulos: true },
+    });
+  }
+
+  // RF-22: la ruta vigente del estudiante es la asignada mas recientemente. El desempate por
+  // idRuta garantiza determinismo cuando dos asignaciones comparten marca de tiempo.
+  async buscarUltimaPorUsuario(
+    idUsuario: number
+  ): Promise<RutaAprendizajeConModulosDetalle | null> {
+    return this.prisma.rutaAprendizaje.findFirst({
+      where: { idUsuario },
+      orderBy: [{ fechaAsignacion: "desc" }, { idRuta: "desc" }],
+      include: {
+        rutaModulos: {
+          include: { modulo: true },
+          orderBy: { ordenSecuencia: "asc" },
+        },
+      },
     });
   }
 }

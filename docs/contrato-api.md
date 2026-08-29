@@ -19,12 +19,15 @@ base de datos y resincroniza automaticamente (ver 3.6):
 - Etapa 6 (RF-21, CU-11): se agrega el grupo `/api/rutas`, exclusivo del rol
   docente, para asignar a un estudiante una ruta de aprendizaje ordenada de
   modulos existentes. Ver seccion 5.
+- Etapa 6 (RF-22, CU-13): se agrega `GET /api/aprendizaje/mi-ruta`, exclusivo
+  del rol estudiante, para consultar la ruta asignada y su progreso. Ver
+  seccion 6.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
-Este documento describe **unicamente los endpoints ya implementados**. El grupo
-`/api/aprendizaje` (estudiante) y `/api/reportes` (docente) (etapa 6-7, RF-22 a
-RF-26) todavia no existen en el backend y no deben asumirse disponibles por el
+Este documento describe **unicamente los endpoints ya implementados**. El resto
+de `/api/aprendizaje` (RF-23, RF-24) y `/api/reportes` (docente, RF-25, RF-26)
+todavia no existen en el backend y no deben asumirse disponibles por el
 frontend. Cuando se implementen, este documento se actualizara.
 
 - URL base (desarrollo): `http://localhost:3000` — puerto por defecto de
@@ -314,7 +317,7 @@ tres campos son obligatorios en el cuerpo (no opcionales).
 | `400` | Cuerpo invalido (ver 1.4) |
 | `401` | Token ausente/invalido/expirado |
 | `403` | Rol sin permiso |
-| `422` | `RecursosInsuficientesError` — ver forma extendida en 7.2 |
+| `422` | `RecursosInsuficientesError` — ver forma extendida en 8.2 |
 
 ### 3.6 `GET /api/servicios/:idServicio`
 
@@ -448,7 +451,7 @@ sobrevive, usar `reiniciar`, no `desplegar`.
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ServicioNoEncontradoError` (no existe o no es del usuario) o `ContenedorNoEncontradoError` (el contenedor Docker subyacente no existe, en `detener`/`reiniciar`/`eliminar`) |
 | `409` | `TransicionInvalidaError` — la operacion no es valida desde el estado actual; o `NombreContenedorEnUsoError` — solo en `desplegar` |
-| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 7.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
+| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 8.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
 | `503` | `MotorDockerNoDisponibleError` — el socket de Docker no responde |
 
 ---
@@ -568,7 +571,39 @@ ruta (viola la llave primaria compuesta de `ruta_modulo`).
 
 ---
 
-## 6. Recursos del servidor — `/api/servidor`
+## 6. Aprendizaje del estudiante — `/api/aprendizaje`
+
+Cubre RF-22 — CU-13. Todas las rutas requieren autenticacion y estan restringidas
+al rol `estudiante`; un docente recibe `403`.
+
+### 6.1 `GET /api/aprendizaje/mi-ruta`
+
+Devuelve la ruta de aprendizaje mas reciente asignada al estudiante autenticado
+(ver 5.1), con sus modulos en el orden de la secuencia y el nombre de cada uno.
+`progreso` es el campo persistido en `RutaAprendizaje` (aun no lo actualiza
+ningun endpoint; queda en `0` hasta que se implemente RF-23/RF-24).
+
+**Response `200 OK`** (con ruta asignada)
+
+```json
+{
+  "idRuta": 1,
+  "progreso": 0,
+  "fechaAsignacion": "2026-08-28T00:00:00.000Z",
+  "modulos": [
+    { "idModulo": 3, "nombre": "Redes en Docker", "ordenSecuencia": 1 },
+    { "idModulo": 1, "nombre": "Introduccion a contenedores", "ordenSecuencia": 2 }
+  ]
+}
+```
+
+**Response `200 OK`** (sin ninguna ruta asignada todavia): `null`.
+
+**Errores posibles**: `401`, `403`.
+
+---
+
+## 7. Recursos del servidor — `/api/servidor`
 
 Cubre RF-10 — CU-04. Requiere solo autenticacion (`autenticar`), sin restriccion de
 rol adicional (cualquier usuario autenticado, estudiante o docente).
@@ -594,7 +629,7 @@ servicio: reflejan el uso de toda la maquina (SO, otros procesos, contenedores D
 
 ---
 
-## 7. Catalogo de errores de dominio
+## 8. Catalogo de errores de dominio
 
 Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 `evento` que registran en bitacora (irrelevante para el frontend salvo como contexto).
@@ -610,13 +645,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
-| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 7.2) |
+| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 8.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
 | `RolNoDisponibleError` | 500 | Se responde con el mensaje generico `Error interno del servidor` (el mensaje real no se expone) | — |
 | Cualquier otro error no controlado | 500 | `Error interno del servidor` | — |
 
-### 7.2 Forma extendida de `RecursosInsuficientesError` (422)
+### 8.2 Forma extendida de `RecursosInsuficientesError` (422)
 
 ```json
 {
@@ -628,12 +663,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 
 ---
 
-## 8. Pendiente / fuera de alcance de este contrato
+## 9. Pendiente / fuera de alcance de este contrato
 
 No implementado aun en el backend (no invocar desde el frontend todavia):
 
 - `PUT /api/usuarios/*` (gestion de perfil, RF-04)
-- `/api/aprendizaje/*` (estudiante, RF-22 a RF-24, CU-12 a CU-14)
+- Resto de `/api/aprendizaje/*` (estudiante, RF-23, RF-24, CU-12, CU-14): solo
+  `GET /api/aprendizaje/mi-ruta` (RF-22, CU-13) esta implementado, ver seccion 6.
 - `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16)
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por

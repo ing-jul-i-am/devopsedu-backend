@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/ruta-aprendizaje-repo.test.ts
 // Pruebas de integracion del repositorio de rutas de aprendizaje contra la base de pruebas.
-// Cubre: RF-21
+// Cubre: RF-21, RF-22
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { RutaAprendizajeRepo } from "@/repositorios/ruta-aprendizaje-repo.js";
@@ -59,6 +59,41 @@ describe("RutaAprendizajeRepo", () => {
       await expect(
         repo.asignar(usuario.idUsuario, [999_999])
       ).rejects.toThrow();
+    });
+  });
+
+  describe("buscarUltimaPorUsuario", () => {
+    it("devuelve la ruta mas reciente del usuario con sus modulos ordenados", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const moduloA = await crearModulo(1);
+      const moduloB = await crearModulo(2);
+      await repo.asignar(usuario.idUsuario, [moduloA.idModulo]);
+      const masReciente = await repo.asignar(usuario.idUsuario, [
+        moduloB.idModulo,
+        moduloA.idModulo,
+      ]);
+
+      // Act
+      const encontrada = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+
+      // Assert
+      expect(encontrada?.idRuta).toBe(masReciente.idRuta);
+      expect(encontrada?.rutaModulos.map((rm) => rm.modulo.nombre)).toEqual([
+        "Modulo 2",
+        "Modulo 1",
+      ]);
+    });
+
+    it("devuelve null cuando el usuario no tiene ninguna ruta asignada", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+
+      // Act
+      const encontrada = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+
+      // Assert
+      expect(encontrada).toBeNull();
     });
   });
 });
