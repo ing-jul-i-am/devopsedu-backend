@@ -11,6 +11,7 @@ import { ServicioRepo } from "./repositorios/servicio-repo.js";
 import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.js";
 import { MetricaRepo } from "./repositorios/metrica-repo.js";
 import { ModuloRepo } from "./repositorios/modulo-repo.js";
+import { RutaAprendizajeRepo } from "./repositorios/ruta-aprendizaje-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import {
@@ -22,6 +23,7 @@ import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
 import { GestorModulos } from "./servicios-aplicacion/gestor-modulos.js";
+import { GestorRutas } from "./servicios-aplicacion/gestor-rutas.js";
 import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import { crearCors } from "./api/middlewares/cors.js";
@@ -56,6 +58,7 @@ export function construirDependencias(
   const registroRepo = new RegistroDespliegueRepo(prisma);
   const metricaRepo = new MetricaRepo(prisma);
   const moduloRepo = new ModuloRepo(prisma);
+  const rutaAprendizajeRepo = new RutaAprendizajeRepo(prisma);
 
   const cifrador = new Cifrador();
   const emisor = new EmisorToken({
@@ -86,6 +89,11 @@ export function construirDependencias(
     verificador,
   });
   const gestorModulos = new GestorModulos(moduloRepo);
+  const gestorRutas = new GestorRutas({
+    rutaRepo: rutaAprendizajeRepo,
+    usuarioRepo,
+    moduloRepo,
+  });
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
   const cors = crearCors(config.corsOrigenes);
@@ -102,6 +110,7 @@ export function construirDependencias(
     gestorServicios,
     gestorDocker,
     gestorModulos,
+    gestorRutas,
     verificador,
     autenticar,
     cors,

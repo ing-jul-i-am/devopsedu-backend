@@ -9,10 +9,12 @@ import type { GestorServicios } from "../servicios-aplicacion/gestor-servicios.j
 import type { GestorDocker } from "../servicios-aplicacion/gestor-docker.js";
 import type { VerificadorRecursos } from "../servicios-aplicacion/verificador-recursos.js";
 import type { GestorModulos } from "../servicios-aplicacion/gestor-modulos.js";
+import type { GestorRutas } from "../servicios-aplicacion/gestor-rutas.js";
 import { crearRutasAuth } from "./rutas/auth.rutas.js";
 import { crearRutasServicios } from "./rutas/servicios.rutas.js";
 import { crearRutasServidor } from "./rutas/servidor.rutas.js";
 import { crearRutasModulos } from "./rutas/modulos.rutas.js";
+import { crearRutasRutasAprendizaje } from "./rutas/rutas.rutas.js";
 import { manejadorErrores } from "./middlewares/manejador-errores.js";
 
 export interface DependenciasApp {
@@ -21,6 +23,7 @@ export interface DependenciasApp {
   gestorDocker: GestorDocker;
   verificador: VerificadorRecursos;
   gestorModulos: GestorModulos;
+  gestorRutas: GestorRutas;
   autenticar: RequestHandler;
   cors: RequestHandler;
 }
@@ -47,6 +50,10 @@ export function crearApp(dependencias: DependenciasApp): Express {
   app.use(
     "/api/modulos",
     crearRutasModulos(dependencias.gestorModulos, dependencias.autenticar)
+  );
+  app.use(
+    "/api/rutas",
+    crearRutasRutasAprendizaje(dependencias.gestorRutas, dependencias.autenticar)
   );
 
   // El manejador de errores se registra al final, tras todas las rutas.

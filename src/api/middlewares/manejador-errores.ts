@@ -11,6 +11,7 @@ import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-er
 import { RecursosInsuficientesError } from "../../dominio/errores/recursos-insuficientes-error.js";
 import { ServicioNoEncontradoError } from "../../dominio/errores/servicio-no-encontrado-error.js";
 import { ModuloNoEncontradoError } from "../../dominio/errores/modulo-no-encontrado-error.js";
+import { UsuarioNoEncontradoError } from "../../dominio/errores/usuario-no-encontrado-error.js";
 import { TransicionInvalidaError } from "../../dominio/errores/transicion-invalida-error.js";
 import { ImagenDockerNoDisponibleError } from "../../dominio/errores/imagen-docker-no-disponible-error.js";
 import { NombreContenedorEnUsoError } from "../../dominio/errores/nombre-contenedor-en-uso-error.js";
@@ -39,7 +40,8 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
 
   if (
     err instanceof ServicioNoEncontradoError ||
-    err instanceof ModuloNoEncontradoError
+    err instanceof ModuloNoEncontradoError ||
+    err instanceof UsuarioNoEncontradoError
   ) {
     res.status(404).json({ error: err.message });
     return;

@@ -16,12 +16,15 @@ base de datos y resincroniza automaticamente (ver 3.6):
 - Etapa 6 (RF-20, CU-10): se agrega el grupo `/api/modulos`, exclusivo del rol
   docente, para la gestion de modulos de aprendizaje (crear, listar, editar).
   Ver seccion 4.
+- Etapa 6 (RF-21, CU-11): se agrega el grupo `/api/rutas`, exclusivo del rol
+  docente, para asignar a un estudiante una ruta de aprendizaje ordenada de
+  modulos existentes. Ver seccion 5.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
-Este documento describe **unicamente los endpoints ya implementados**. Los grupos
-`/api/aprendizaje` y `/api/rutas`, `/api/reportes` (etapa 6-7, RF-21 a RF-26)
-todavia no existen en el backend y no deben asumirse disponibles por el
+Este documento describe **unicamente los endpoints ya implementados**. El grupo
+`/api/aprendizaje` (estudiante) y `/api/reportes` (docente) (etapa 6-7, RF-22 a
+RF-26) todavia no existen en el backend y no deben asumirse disponibles por el
 frontend. Cuando se implementen, este documento se actualizara.
 
 - URL base (desarrollo): `http://localhost:3000` — puerto por defecto de
@@ -311,7 +314,7 @@ tres campos son obligatorios en el cuerpo (no opcionales).
 | `400` | Cuerpo invalido (ver 1.4) |
 | `401` | Token ausente/invalido/expirado |
 | `403` | Rol sin permiso |
-| `422` | `RecursosInsuficientesError` — ver forma extendida en 6.2 |
+| `422` | `RecursosInsuficientesError` — ver forma extendida en 7.2 |
 
 ### 3.6 `GET /api/servicios/:idServicio`
 
@@ -445,7 +448,7 @@ sobrevive, usar `reiniciar`, no `desplegar`.
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ServicioNoEncontradoError` (no existe o no es del usuario) o `ContenedorNoEncontradoError` (el contenedor Docker subyacente no existe, en `detener`/`reiniciar`/`eliminar`) |
 | `409` | `TransicionInvalidaError` — la operacion no es valida desde el estado actual; o `NombreContenedorEnUsoError` — solo en `desplegar` |
-| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 6.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
+| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 7.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
 | `503` | `MotorDockerNoDisponibleError` — el socket de Docker no responde |
 
 ---
@@ -519,7 +522,53 @@ actualizan los enviados.
 
 ---
 
-## 5. Recursos del servidor — `/api/servidor`
+## 5. Rutas de aprendizaje — `/api/rutas`
+
+Cubre RF-21 — CU-11. Todas las rutas requieren autenticacion y estan restringidas
+al rol `docente`; un estudiante recibe `403`.
+
+### 5.1 `POST /api/rutas`
+
+Asigna a un estudiante una ruta de aprendizaje compuesta por modulos existentes, en
+el orden recibido. `ordenSecuencia` se deriva de la posicion de cada `idModulo`
+dentro del arreglo (base 1); no se puede repetir un mismo `idModulo` en la misma
+ruta (viola la llave primaria compuesta de `ruta_modulo`).
+
+**Request body**
+
+```json
+{
+  "idUsuario": "entero positivo (id del estudiante destino)",
+  "idModulos": "arreglo de enteros positivos, minimo 1 elemento, en el orden deseado"
+}
+```
+
+**Response `201 Created`**
+
+```json
+{
+  "idRuta": 1,
+  "idUsuario": 5,
+  "progreso": 0,
+  "fechaAsignacion": "2026-08-28T00:00:00.000Z",
+  "modulos": [
+    { "idModulo": 3, "ordenSecuencia": 1 },
+    { "idModulo": 1, "ordenSecuencia": 2 }
+  ]
+}
+```
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido (ver 1.4) — por ejemplo, `idModulos` vacio |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `UsuarioNoEncontradoError` — el `idUsuario` no existe; o `ModuloNoEncontradoError` — alguno de los `idModulos` no existe |
+
+---
+
+## 6. Recursos del servidor — `/api/servidor`
 
 Cubre RF-10 — CU-04. Requiere solo autenticacion (`autenticar`), sin restriccion de
 rol adicional (cualquier usuario autenticado, estudiante o docente).
@@ -545,7 +594,7 @@ servicio: reflejan el uso de toda la maquina (SO, otros procesos, contenedores D
 
 ---
 
-## 6. Catalogo de errores de dominio
+## 7. Catalogo de errores de dominio
 
 Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 `evento` que registran en bitacora (irrelevante para el frontend salvo como contexto).
@@ -561,13 +610,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
-| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 6.2) |
+| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 7.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
 | `RolNoDisponibleError` | 500 | Se responde con el mensaje generico `Error interno del servidor` (el mensaje real no se expone) | — |
 | Cualquier otro error no controlado | 500 | `Error interno del servidor` | — |
 
-### 6.2 Forma extendida de `RecursosInsuficientesError` (422)
+### 7.2 Forma extendida de `RecursosInsuficientesError` (422)
 
 ```json
 {
@@ -579,13 +628,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 
 ---
 
-## 7. Pendiente / fuera de alcance de este contrato
+## 8. Pendiente / fuera de alcance de este contrato
 
 No implementado aun en el backend (no invocar desde el frontend todavia):
 
 - `PUT /api/usuarios/*` (gestion de perfil, RF-04)
 - `/api/aprendizaje/*` (estudiante, RF-22 a RF-24, CU-12 a CU-14)
-- `/api/rutas`, `/api/reportes` (docente, RF-21, RF-25, RF-26, CU-11, CU-15, CU-16)
+- `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16)
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por
   `MonitorPeriodico` (RF-16, RF-18, RF-19); no hay endpoint de "metrica actual" fuera
