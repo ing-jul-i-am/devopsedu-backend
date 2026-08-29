@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a5e6f7c8-0002-4b3c-9d4e-devopsedu0002",
     "name": "DevOpsEdu Backend",
-    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10) e historico de metricas (RF-18).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios.\n4. Los requests de Login guardan el token automaticamente; el request de Crear servicio guarda el idServicio automaticamente.",
+    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) y componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -54,6 +54,7 @@
                   "    const datos = pm.response.json();",
                   "    pm.expect(datos).to.have.property('token');",
                   "    pm.environment.set('tokenEstudiante', datos.token);",
+                  "    pm.environment.set('idUsuarioEstudiante', datos.usuario.idUsuario);",
                   "});"
                 ]
               }
@@ -338,6 +339,179 @@
       ]
     },
     {
+      "name": "Modulos",
+      "item": [
+        {
+          "name": "Crear modulo: Introduccion a contenedores",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 modulo creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('idModulo');",
+                  "    pm.environment.set('idModulo1', datos.idModulo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Introduccion a contenedores\",\n  \"contenidoTeorico\": \"Los contenedores empaquetan una aplicacion y sus dependencias en una unidad ejecutable aislada.\",\n  \"orden\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": ["{{baseUrl}}"],
+              "path": ["modulos"]
+            },
+            "description": "RF-20 / CU-10: creacion de un modulo de aprendizaje. Exclusivo del rol docente. Guarda idModulo1 automaticamente."
+          }
+        },
+        {
+          "name": "Crear modulo: Redes en Docker",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 modulo creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('idModulo');",
+                  "    pm.environment.set('idModulo2', datos.idModulo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Redes en Docker\",\n  \"contenidoTeorico\": \"Docker crea redes virtuales para que los contenedores se comuniquen entre si de forma aislada.\",\n  \"orden\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": ["{{baseUrl}}"],
+              "path": ["modulos"]
+            },
+            "description": "RF-20 / CU-10: segundo modulo, para poder demostrar el orden de una ruta de aprendizaje con mas de un modulo. Guarda idModulo2 automaticamente."
+          }
+        },
+        {
+          "name": "Listar modulos",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": ["{{baseUrl}}"],
+              "path": ["modulos"]
+            },
+            "description": "RF-20 / CU-10: lista todos los modulos, ordenados por 'orden' ascendente. Exclusivo del rol docente."
+          }
+        },
+        {
+          "name": "Editar modulo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Introduccion a contenedores (actualizado)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos/{{idModulo1}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["modulos", "{{idModulo1}}"]
+            },
+            "description": "RF-20 / CU-10: edicion parcial de un modulo existente; solo se actualizan los campos enviados."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rutas",
+      "item": [
+        {
+          "name": "Asignar ruta de aprendizaje a estudiante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 ruta asignada', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('idRuta');",
+                  "    pm.environment.set('idRuta', datos.idRuta);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": {{idUsuarioEstudiante}},\n  \"idModulos\": [{{idModulo2}}, {{idModulo1}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rutas",
+              "host": ["{{baseUrl}}"],
+              "path": ["rutas"]
+            },
+            "description": "RF-21 / CU-11: asigna al estudiante una ruta de aprendizaje con los modulos en el orden del arreglo (aqui, primero Redes en Docker y luego Introduccion a contenedores, a proposito para demostrar que ordenSecuencia sigue el orden recibido, no el campo 'orden' del modulo). Exclusivo del rol docente. Requiere haber corrido antes Login estudiante y los dos requests de Crear modulo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Aprendizaje",
+      "item": [
+        {
+          "name": "Consultar mi ruta",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/aprendizaje/mi-ruta",
+              "host": ["{{baseUrl}}"],
+              "path": ["aprendizaje", "mi-ruta"]
+            },
+            "description": "RF-22 / CU-13: ruta de aprendizaje mas reciente asignada al estudiante autenticado, con sus modulos ordenados y el progreso (0 hasta que se implementen RF-23/RF-24). Devuelve null si aun no se le asigno ninguna ruta. Exclusivo del rol estudiante."
+          }
+        }
+      ]
+    },
+    {
       "name": "Casos de error (demo RNF-12 / RNF-14)",
       "item": [
         {
@@ -412,6 +586,46 @@
               "path": ["servicios", "999999", "desplegar"]
             },
             "description": "ServicioNoEncontradoError -> 404."
+          }
+        },
+        {
+          "name": "Crear modulo como estudiante -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Intento no autorizado\",\n  \"contenidoTeorico\": \"c\",\n  \"orden\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": ["{{baseUrl}}"],
+              "path": ["modulos"]
+            },
+            "description": "RF-04 / DT-03: el middleware autorizar('docente') debe rechazar con PermisoDenegadoError -> 403 antes de llegar al controlador."
+          }
+        },
+        {
+          "name": "Asignar ruta con modulo inexistente -> 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": {{idUsuarioEstudiante}},\n  \"idModulos\": [999999]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rutas",
+              "host": ["{{baseUrl}}"],
+              "path": ["rutas"]
+            },
+            "description": "ModuloNoEncontradoError -> 404. GestorRutas verifica cada idModulo antes de persistir la ruta."
           }
         }
       ]
