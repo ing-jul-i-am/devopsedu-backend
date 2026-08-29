@@ -13,12 +13,15 @@ base de datos y resincroniza automaticamente (ver 3.6):
   recuperarlos.
 - commit `412b900`: servicios `detenido` cuyo contenedor se inicio fuera de la
   plataforma se resincronizan a `en_ejecucion`.
+- Etapa 6 (RF-20, CU-10): se agrega el grupo `/api/modulos`, exclusivo del rol
+  docente, para la gestion de modulos de aprendizaje (crear, listar, editar).
+  Ver seccion 4.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
 Este documento describe **unicamente los endpoints ya implementados**. Los grupos
-`/api/aprendizaje`, `/api/modulos`, `/api/rutas` y `/api/reportes` (etapa 6-7, RF-20 a
-RF-26) todavia no existen en el backend y no deben asumirse disponibles por el
+`/api/aprendizaje` y `/api/rutas`, `/api/reportes` (etapa 6-7, RF-21 a RF-26)
+todavia no existen en el backend y no deben asumirse disponibles por el
 frontend. Cuando se implementen, este documento se actualizara.
 
 - URL base (desarrollo): `http://localhost:3000` — puerto por defecto de
@@ -308,7 +311,7 @@ tres campos son obligatorios en el cuerpo (no opcionales).
 | `400` | Cuerpo invalido (ver 1.4) |
 | `401` | Token ausente/invalido/expirado |
 | `403` | Rol sin permiso |
-| `422` | `RecursosInsuficientesError` — ver forma extendida en 4.2 |
+| `422` | `RecursosInsuficientesError` — ver forma extendida en 6.2 |
 
 ### 3.6 `GET /api/servicios/:idServicio`
 
@@ -442,12 +445,81 @@ sobrevive, usar `reiniciar`, no `desplegar`.
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ServicioNoEncontradoError` (no existe o no es del usuario) o `ContenedorNoEncontradoError` (el contenedor Docker subyacente no existe, en `detener`/`reiniciar`/`eliminar`) |
 | `409` | `TransicionInvalidaError` — la operacion no es valida desde el estado actual; o `NombreContenedorEnUsoError` — solo en `desplegar` |
-| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 4.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
+| `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 6.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
 | `503` | `MotorDockerNoDisponibleError` — el socket de Docker no responde |
 
 ---
 
-## 4. Recursos del servidor — `/api/servidor`
+## 4. Modulos de aprendizaje — `/api/modulos`
+
+Cubre RF-20 — CU-10. Todas las rutas requieren autenticacion y estan restringidas
+al rol `docente` (`autorizar("docente")`); un estudiante recibe `403` en cualquiera
+de ellas.
+
+### 4.1 Forma comun: objeto Modulo
+
+```json
+{
+  "idModulo": 1,
+  "nombre": "Introduccion a contenedores",
+  "contenidoTeorico": "Los contenedores empaquetan una aplicacion y sus dependencias.",
+  "orden": 1
+}
+```
+
+### 4.2 `GET /api/modulos`
+
+Lista todos los modulos existentes, ordenados por `orden` ascendente.
+
+**Response `200 OK`**: arreglo de objetos Modulo (seccion 4.1).
+
+**Errores posibles**: `401`, `403`.
+
+### 4.3 `POST /api/modulos`
+
+**Request body**
+
+```json
+{
+  "nombre": "string, 3-160 caracteres",
+  "contenidoTeorico": "string no vacio",
+  "orden": "entero > 0"
+}
+```
+
+**Response `201 Created`**: objeto Modulo (seccion 4.1).
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido (ver 1.4) |
+| `401` / `403` | Igual que el resto del grupo |
+
+### 4.4 `PUT /api/modulos/:idModulo`
+
+Edita un modulo existente. Todos los campos del cuerpo son opcionales; solo se
+actualizan los enviados.
+
+**Request body**
+
+```json
+{ "...": "subconjunto de los campos de 4.3, todos opcionales" }
+```
+
+**Response `200 OK`**: objeto Modulo (seccion 4.1) con los campos actualizados.
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido (ver 1.4) |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoEncontradoError` — no existe un modulo con ese id |
+
+---
+
+## 5. Recursos del servidor — `/api/servidor`
 
 Cubre RF-10 — CU-04. Requiere solo autenticacion (`autenticar`), sin restriccion de
 rol adicional (cualquier usuario autenticado, estudiante o docente).
@@ -473,7 +545,7 @@ servicio: reflejan el uso de toda la maquina (SO, otros procesos, contenedores D
 
 ---
 
-## 5. Catalogo de errores de dominio
+## 6. Catalogo de errores de dominio
 
 Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 `evento` que registran en bitacora (irrelevante para el frontend salvo como contexto).
@@ -484,17 +556,18 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `TokenInvalidoError` | 401 | `Token invalido o expirado` | — |
 | `PermisoDenegadoError` | 403 | `No tiene permiso para realizar esta accion` | — |
 | `ServicioNoEncontradoError` | 404 | `Servicio no encontrado` | — |
+| `ModuloNoEncontradoError` | 404 | `Modulo no encontrado` | — |
 | `ContenedorNoEncontradoError` | 404 | `El contenedor del servicio no existe` | — |
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
-| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 4.2) |
+| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 6.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
 | `RolNoDisponibleError` | 500 | Se responde con el mensaje generico `Error interno del servidor` (el mensaje real no se expone) | — |
 | Cualquier otro error no controlado | 500 | `Error interno del servidor` | — |
 
-### 4.2 Forma extendida de `RecursosInsuficientesError` (422)
+### 6.2 Forma extendida de `RecursosInsuficientesError` (422)
 
 ```json
 {
@@ -506,14 +579,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 
 ---
 
-## 6. Pendiente / fuera de alcance de este contrato
+## 7. Pendiente / fuera de alcance de este contrato
 
 No implementado aun en el backend (no invocar desde el frontend todavia):
 
 - `PUT /api/usuarios/*` (gestion de perfil, RF-04)
 - `/api/aprendizaje/*` (estudiante, RF-22 a RF-24, CU-12 a CU-14)
-- `/api/modulos`, `/api/rutas`, `/api/reportes` (docente, RF-20, RF-21, RF-25, RF-26,
-  CU-10, CU-11, CU-15, CU-16)
+- `/api/rutas`, `/api/reportes` (docente, RF-21, RF-25, RF-26, CU-11, CU-15, CU-16)
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por
   `MonitorPeriodico` (RF-16, RF-18, RF-19); no hay endpoint de "metrica actual" fuera

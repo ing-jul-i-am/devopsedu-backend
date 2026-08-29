@@ -10,6 +10,7 @@ import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-err
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
 import { RecursosInsuficientesError } from "../../dominio/errores/recursos-insuficientes-error.js";
 import { ServicioNoEncontradoError } from "../../dominio/errores/servicio-no-encontrado-error.js";
+import { ModuloNoEncontradoError } from "../../dominio/errores/modulo-no-encontrado-error.js";
 import { TransicionInvalidaError } from "../../dominio/errores/transicion-invalida-error.js";
 import { ImagenDockerNoDisponibleError } from "../../dominio/errores/imagen-docker-no-disponible-error.js";
 import { NombreContenedorEnUsoError } from "../../dominio/errores/nombre-contenedor-en-uso-error.js";
@@ -36,7 +37,10 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
-  if (err instanceof ServicioNoEncontradoError) {
+  if (
+    err instanceof ServicioNoEncontradoError ||
+    err instanceof ModuloNoEncontradoError
+  ) {
     res.status(404).json({ error: err.message });
     return;
   }

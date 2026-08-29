@@ -10,6 +10,7 @@ import { RolRepo } from "./repositorios/rol-repo.js";
 import { ServicioRepo } from "./repositorios/servicio-repo.js";
 import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.js";
 import { MetricaRepo } from "./repositorios/metrica-repo.js";
+import { ModuloRepo } from "./repositorios/modulo-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import {
@@ -20,6 +21,7 @@ import { Autenticador } from "./servicios-aplicacion/autenticador.js";
 import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos.js";
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
+import { GestorModulos } from "./servicios-aplicacion/gestor-modulos.js";
 import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import { crearCors } from "./api/middlewares/cors.js";
@@ -53,6 +55,7 @@ export function construirDependencias(
   const servicioRepo = new ServicioRepo(prisma);
   const registroRepo = new RegistroDespliegueRepo(prisma);
   const metricaRepo = new MetricaRepo(prisma);
+  const moduloRepo = new ModuloRepo(prisma);
 
   const cifrador = new Cifrador();
   const emisor = new EmisorToken({
@@ -82,6 +85,7 @@ export function construirDependencias(
     registroRepo,
     verificador,
   });
+  const gestorModulos = new GestorModulos(moduloRepo);
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
   const cors = crearCors(config.corsOrigenes);
@@ -97,6 +101,7 @@ export function construirDependencias(
     autenticador,
     gestorServicios,
     gestorDocker,
+    gestorModulos,
     verificador,
     autenticar,
     cors,
