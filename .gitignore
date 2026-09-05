@@ -7,3 +7,7 @@ node_modules
 dist
 coverage
 *.tsbuildinfo
+
+# Archivos subidos (imagenes de contenido de modulo) y datos de pruebas
+/uploads
+/tests-tmp

@@ -28,6 +28,7 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
   crear: RequestHandler;
   listar: RequestHandler;
   editar: RequestHandler;
+  subirImagen: RequestHandler;
 } {
   const crear: RequestHandler = async (req, res, next) => {
     try {
@@ -57,5 +58,11 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
     }
   };
 
-  return { crear, listar, editar };
+  // El middleware de subida (subida-imagen.ts) ya garantiza que req.file existe en este punto.
+  const subirImagen: RequestHandler = (req, res) => {
+    const archivo = req.file as Express.Multer.File;
+    res.status(201).json({ url: `/archivos/modulos/${archivo.filename}` });
+  };
+
+  return { crear, listar, editar, subirImagen };
 }

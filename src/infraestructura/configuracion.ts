@@ -35,6 +35,9 @@ const esquemaConfiguracion = z.object({
         .map((origen) => origen.trim())
         .filter((origen) => origen.length > 0)
     ),
+  // Carpeta del sistema de archivos donde se guardan las imagenes subidas para bloques de
+  // contenido de modulo (RF-20, ver DT-09).
+  RUTA_ALMACENAMIENTO_MODULOS: z.string().min(1).default("uploads/modulos"),
 });
 
 export type Configuracion = z.infer<typeof esquemaConfiguracion>;

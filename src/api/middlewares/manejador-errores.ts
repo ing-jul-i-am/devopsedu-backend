@@ -17,6 +17,9 @@ import { ImagenDockerNoDisponibleError } from "../../dominio/errores/imagen-dock
 import { NombreContenedorEnUsoError } from "../../dominio/errores/nombre-contenedor-en-uso-error.js";
 import { ContenedorNoEncontradoError } from "../../dominio/errores/contenedor-no-encontrado-error.js";
 import { MotorDockerNoDisponibleError } from "../../dominio/errores/motor-docker-no-disponible-error.js";
+import { TipoArchivoNoPermitidoError } from "../../dominio/errores/tipo-archivo-no-permitido-error.js";
+import { ArchivoDemasiadoGrandeError } from "../../dominio/errores/archivo-demasiado-grande-error.js";
+import { ArchivoNoProporcionadoError } from "../../dominio/errores/archivo-no-proporcionado-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
 export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
@@ -83,6 +86,20 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof MotorDockerNoDisponibleError) {
     logger.error({ evento: "motor_docker_no_disponible" });
     res.status(503).json({ error: err.message });
+    return;
+  }
+
+  if (
+    err instanceof TipoArchivoNoPermitidoError ||
+    err instanceof ArchivoDemasiadoGrandeError
+  ) {
+    logger.warn({ evento: "subida_archivo_rechazada", ruta: req.path });
+    res.status(400).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ArchivoNoProporcionadoError) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

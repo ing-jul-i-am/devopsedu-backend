@@ -17,6 +17,7 @@ const dependencias = construirDependencias(prismaCliente, {
   rutaDisco: configuracion.SERVIDOR_RUTA_DISCO,
   monitorIntervaloMs: configuracion.MONITOR_INTERVALO_MS,
   corsOrigenes: configuracion.CORS_ORIGENES,
+  rutaAlmacenamientoModulos: configuracion.RUTA_ALMACENAMIENTO_MODULOS,
 });
 
 const app = crearApp(dependencias);

@@ -29,7 +29,10 @@ import { GestorUsuarios } from "./servicios-aplicacion/gestor-usuarios.js";
 import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import { crearCors } from "./api/middlewares/cors.js";
+import { crearMiddlewareSubidaImagen } from "./api/middlewares/subida-imagen.js";
 import type { DependenciasApp } from "./api/app.js";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
 export interface ConfigApp {
   jwtSecreto: string;
@@ -38,6 +41,7 @@ export interface ConfigApp {
   rutaDisco: string;
   monitorIntervaloMs: number;
   corsOrigenes: string[];
+  rutaAlmacenamientoModulos: string;
 }
 
 export type DependenciasCompletas = DependenciasApp & {
@@ -104,6 +108,10 @@ export function construirDependencias(
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
   const cors = crearCors(config.corsOrigenes);
 
+  const rutaArchivosModulos = resolve(config.rutaAlmacenamientoModulos);
+  mkdirSync(rutaArchivosModulos, { recursive: true });
+  const subirImagenModulo = crearMiddlewareSubidaImagen(rutaArchivosModulos);
+
   const monitor = new MonitorPeriodico({
     servicioRepo,
     metricaRepo,
@@ -122,6 +130,8 @@ export function construirDependencias(
     verificador,
     autenticar,
     cors,
+    subirImagenModulo,
+    rutaArchivosModulos,
     monitor,
   };
 }

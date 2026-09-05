@@ -32,6 +32,8 @@ export interface DependenciasApp {
   gestorUsuarios: GestorUsuarios;
   autenticar: RequestHandler;
   cors: RequestHandler;
+  subirImagenModulo: RequestHandler;
+  rutaArchivosModulos: string;
 }
 
 export function crearApp(dependencias: DependenciasApp): Express {
@@ -55,7 +57,20 @@ export function crearApp(dependencias: DependenciasApp): Express {
   );
   app.use(
     "/api/modulos",
-    crearRutasModulos(dependencias.gestorModulos, dependencias.autenticar)
+    crearRutasModulos(
+      dependencias.gestorModulos,
+      dependencias.autenticar,
+      dependencias.subirImagenModulo
+    )
+  );
+  // Servido publico y sin autenticacion: un <img src> no puede adjuntar el header
+  // Authorization, y el contenido educativo no es sensible (DT-09).
+  app.use(
+    "/archivos/modulos",
+    express.static(dependencias.rutaArchivosModulos, {
+      index: false,
+      dotfiles: "ignore",
+    })
   );
   app.use(
     "/api/rutas",

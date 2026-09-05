@@ -6,6 +6,7 @@ import type { Express } from "express";
 import { crearApp } from "@/api/app.js";
 import { construirDependencias } from "@/composicion.js";
 import { prismaTest } from "./prisma-test.js";
+import { RUTA_UPLOADS_PRUEBAS } from "./ruta-uploads-prueba.js";
 
 export function construirApp(): Express {
   // Medicion determinista para las pruebas (no depende del estado real de la maquina).
@@ -23,6 +24,7 @@ export function construirApp(): Express {
       rutaDisco: "/",
       monitorIntervaloMs: 5000,
       corsOrigenes: ["http://localhost:5173"],
+      rutaAlmacenamientoModulos: RUTA_UPLOADS_PRUEBAS,
     },
     medirRecursos
   );

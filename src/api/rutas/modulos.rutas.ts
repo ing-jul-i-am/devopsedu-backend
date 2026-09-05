@@ -13,7 +13,8 @@ import { editarModuloSchema } from "../validadores/modulos/editar-modulo.validad
 
 export function crearRutasModulos(
   gestorModulos: GestorModulos,
-  autenticar: RequestHandler
+  autenticar: RequestHandler,
+  subirImagenModulo: RequestHandler
 ): Router {
   const router = Router();
   const c = crearControladoresModulos(gestorModulos);
@@ -21,6 +22,7 @@ export function crearRutasModulos(
 
   router.get("/", autenticar, rol, c.listar);
   router.post("/", autenticar, rol, validar(crearModuloSchema), c.crear);
+  router.post("/imagenes", autenticar, rol, subirImagenModulo, c.subirImagen);
   router.put(
     "/:idModulo",
     autenticar,
