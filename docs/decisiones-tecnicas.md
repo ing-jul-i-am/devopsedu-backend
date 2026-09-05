@@ -275,3 +275,61 @@ id por URL) y probablemente reemplace este por uno mas restringido.
   `/api/usuarios`. Descartada en favor de `/api/usuarios` porque el contrato ya anticipaba ese
   recurso como pendiente (`docs/contrato-api.md`, seccion 9) y porque la operacion actua sobre
   un usuario identificado por id, no sobre la sesion de quien invoca.
+
+## DT-09: contenido de modulo pasa a bloques estructurados (Json) con subida de imagenes
+
+**Fecha:** 2026-09-05
+
+**Contexto:** El campo `Modulo.contenidoTeorico` (RF-20) solo admitia texto plano, lo que
+limitaba el material didactico que un docente podia construir: sin imagenes, sin texto con
+formato (negritas, listas, titulos) y sin enlaces de referencia. El desarrollador solicito
+ampliar la gestion de modulos para soportar estas herramientas didacticas.
+
+**Decision:**
+1. **Contenido en bloques (Json).** `Modulo.contenidoTeorico` (`String`) se reemplaza por
+   `Modulo.contenido` (`Json`), un arreglo ordenado de bloques discriminados por el campo
+   `tipo`: `texto` (Markdown), `imagen` (url + texto alternativo opcional) y `enlace` (url +
+   titulo + descripcion opcional). El orden del arreglo es el orden de lectura; no existe un
+   campo de orden dentro de cada bloque. El tipo de dominio vive en
+   `src/dominio/modelos/bloque-contenido.ts` y el esquema de validacion en
+   `src/api/validadores/modulos/bloque-contenido.validador.ts` (`z.discriminatedUnion`).
+   Es un reemplazo limpio sin retrocompatibilidad: la migracion
+   (`20260905222745_reemplaza_contenido_teorico_por_bloques_json`) convierte el texto existente
+   en un unico bloque de tipo `texto` para no perder los datos de desarrollo, pero no se ofrece
+   ninguna via de "revertir" a texto plano.
+2. **Subida real de imagenes.** Se agrega `POST /api/modulos/imagenes`
+   (`multipart/form-data`, campo `imagen`) para que el docente suba un archivo y lo referencie
+   luego desde un bloque `imagen`. Se incorpora `multer` como dependencia nueva: es el
+   middleware estandar de facto para `multipart/form-data` en Express, evita reimplementar a
+   mano el parseo de streams multipart (superficie de error y de seguridad no trivial), y no
+   existia ninguna dependencia equivalente en el proyecto. El archivo se guarda en disco con un
+   nombre generado por `randomUUID()` (nunca a partir del nombre original, para evitar
+   colisiones y ataques de path traversal), validando tipo MIME (`image/png`, `image/jpeg`,
+   `image/webp`, `image/gif`) y tamano maximo (5 MB) en `src/api/middlewares/subida-imagen.ts`.
+3. **Servido publico sin autenticacion.** Las imagenes se sirven mediante `express.static` en
+   `/archivos/modulos/*`, fuera de `/api` y sin pasar por `autenticar`. Es una desviacion
+   deliberada del resto de la API (todo lo demas exige JWT): un `<img src>` del navegador no
+   puede adjuntar el header `Authorization`, y el contenido educativo de un modulo no se
+   considera sensible. La mitigacion de acceso no autorizado se apoya en que el nombre de
+   archivo es un UUID no adivinable, no en autenticacion.
+
+**Consecuencias:** La validacion del tipo de archivo confia en el `Content-Type` declarado por
+el cliente en la peticion multipart, no en una inspeccion de los bytes reales (`magic numbers`);
+para el alcance de este prototipo academico se considera un riesgo aceptable (RNF-20), pero un
+uso en produccion deberia agregar esa verificacion. Los archivos subidos no se eliminan cuando
+un modulo se edita o dejan de referenciarse desde ningun bloque (no hay recoleccion de huerfanos);
+tampoco hay limite de espacio en disco mas alla del limite por archivo. La exposicion de
+`contenido` al estudiante (endpoints `/api/aprendizaje/mi-ruta` y `/api/rutas`) queda fuera de
+esta decision: por ahora solo se expande la gestion del lado del docente.
+
+**Alternativas consideradas:**
+- Mantener imagenes solo por URL externa (sin subida real). Descartada porque el desarrollador
+  pidio explicitamente que el docente pudiera subir el archivo, no solo enlazarlo.
+- Modelar cada tipo de bloque como una tabla relacional propia en vez de un campo `Json`.
+  Descartada por ser un prototipo academico sin necesidad de consultar bloques de forma
+  independiente del modulo; ademas el proyecto ya usa `Json` para estructuras variables
+  similares (`ConfiguracionServicio.puertos/variablesEntorno/volumenes`).
+- Servir las imagenes a traves de un endpoint autenticado dentro de `/api` en vez de
+  `express.static` publico. Descartada porque un `<img src>` no adjunta headers personalizados
+  sin trabajo adicional en el frontend (fetch + blob URL), y el contenido no se considera
+  sensible en este prototipo.

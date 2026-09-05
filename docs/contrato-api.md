@@ -466,14 +466,30 @@ de ellas.
 
 ### 4.1 Forma comun: objeto Modulo
 
+El contenido del modulo es un arreglo ordenado de bloques (el orden del arreglo
+es el orden de lectura); cada bloque es uno de tres tipos discriminados por el
+campo `tipo` (ver DT-09):
+
 ```json
 {
   "idModulo": 1,
   "nombre": "Introduccion a contenedores",
-  "contenidoTeorico": "Los contenedores empaquetan una aplicacion y sus dependencias.",
+  "contenido": [
+    { "tipo": "texto", "contenido": "Los contenedores empaquetan una aplicacion y sus dependencias (Markdown)." },
+    { "tipo": "imagen", "url": "/archivos/modulos/3f2a...c1.png", "textoAlternativo": "Diagrama de arquitectura" },
+    { "tipo": "enlace", "url": "https://docs.docker.com/", "titulo": "Documentacion oficial de Docker", "descripcion": "Referencia completa" }
+  ],
   "orden": 1
 }
 ```
+
+Formas de bloque:
+
+| Tipo | Campos |
+| --- | --- |
+| `texto` | `contenido: string` (Markdown, no vacio) |
+| `imagen` | `url: string` (ruta devuelta por 4.5), `textoAlternativo?: string` |
+| `enlace` | `url: string` (URL absoluta), `titulo: string`, `descripcion?: string` |
 
 ### 4.2 `GET /api/modulos`
 
@@ -490,7 +506,7 @@ Lista todos los modulos existentes, ordenados por `orden` ascendente.
 ```json
 {
   "nombre": "string, 3-160 caracteres",
-  "contenidoTeorico": "string no vacio",
+  "contenido": "arreglo de 1 a 50 bloques (ver 4.1)",
   "orden": "entero > 0"
 }
 ```
@@ -501,7 +517,7 @@ Lista todos los modulos existentes, ordenados por `orden` ascendente.
 
 | Codigo | Cuando |
 | --- | --- |
-| `400` | Cuerpo invalido (ver 1.4) |
+| `400` | Cuerpo invalido (ver 1.4): arreglo `contenido` vacio o con mas de 50 bloques, bloque con `tipo` no reconocido, o bloque sin sus campos obligatorios |
 | `401` / `403` | Igual que el resto del grupo |
 
 ### 4.4 `PUT /api/modulos/:idModulo`
@@ -524,6 +540,33 @@ actualizan los enviados.
 | `400` | Cuerpo invalido (ver 1.4) |
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ModuloNoEncontradoError` — no existe un modulo con ese id |
+
+### 4.5 `POST /api/modulos/imagenes`
+
+Sube una imagen para usarla en un bloque de tipo `imagen` (ver 4.1). Recibe un
+`multipart/form-data` con un unico campo de archivo llamado `imagen`.
+
+**Limites**: tamano maximo 5 MB; tipos MIME permitidos `image/png`,
+`image/jpeg`, `image/webp`, `image/gif` (validado por el `Content-Type`
+declarado, no por los bytes reales del archivo — ver DT-09). El archivo se
+guarda con un nombre generado (UUID), nunca con el nombre original.
+
+**Response `201 Created`**
+
+```json
+{ "url": "/archivos/modulos/3f2a1b7c-....png" }
+```
+
+La `url` devuelta se sirve mediante `GET` sin autenticacion (montaje estatico
+en `/archivos/modulos/*`, fuera de `/api` — ver DT-09), porque un `<img src>`
+del frontend no puede adjuntar el header `Authorization`.
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | No se adjunto ningun archivo, el tipo MIME no esta permitido, o el archivo excede 5 MB |
+| `401` / `403` | Igual que el resto del grupo |
 
 ---
 
@@ -684,6 +727,9 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
+| `TipoArchivoNoPermitidoError` | 400 | `Tipo de archivo no permitido` | — |
+| `ArchivoDemasiadoGrandeError` | 400 | `El archivo excede el tamano maximo permitido` | — |
+| `ArchivoNoProporcionadoError` | 400 | `No se proporciono ningun archivo` | — |
 | `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 9.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
