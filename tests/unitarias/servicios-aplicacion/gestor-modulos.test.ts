@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { GestorModulos } from "@/servicios-aplicacion/gestor-modulos.js";
 import { ModuloNoEncontradoError } from "@/dominio/errores/modulo-no-encontrado-error.js";
+import { datosModuloValidos } from "../../fixtures/modulo.factory.js";
 
 function crearModuloRepoMock() {
   return {
@@ -19,7 +20,7 @@ describe("GestorModulos", () => {
     it("delega la creacion en el repositorio y devuelve el modulo creado", async () => {
       // Arrange
       const repoMock = crearModuloRepoMock();
-      const datos = { nombre: "Redes", contenidoTeorico: "c", orden: 1 };
+      const datos = datosModuloValidos();
       repoMock.crear.mockResolvedValue({ idModulo: 1, ...datos });
       const gestor = new GestorModulos(repoMock as any);
 
@@ -53,15 +54,11 @@ describe("GestorModulos", () => {
       const repoMock = crearModuloRepoMock();
       repoMock.buscarPorId.mockResolvedValue({
         idModulo: 1,
-        nombre: "Redes",
-        contenidoTeorico: "c",
-        orden: 1,
+        ...datosModuloValidos(),
       });
       repoMock.actualizar.mockResolvedValue({
         idModulo: 1,
-        nombre: "Redes en Docker",
-        contenidoTeorico: "c",
-        orden: 2,
+        ...datosModuloValidos({ nombre: "Redes en Docker", orden: 2 }),
       });
       const gestor = new GestorModulos(repoMock as any);
 

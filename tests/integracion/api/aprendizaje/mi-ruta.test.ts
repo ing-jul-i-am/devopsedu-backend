@@ -8,6 +8,7 @@ import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
 import { crearUsuarioConRol } from "../../../ayudas/crear-usuario-con-rol.js";
+import { crearModuloEnBd } from "../../../fixtures/modulo.factory.js";
 
 const ESTUDIANTE = {
   nombre: "Luis Estudiante",
@@ -47,12 +48,8 @@ describe("GET /api/aprendizaje/mi-ruta", () => {
     const estudiante = await prismaTest.usuario.findUniqueOrThrow({
       where: { correo: ESTUDIANTE.correo },
     });
-    const moduloA = await prismaTest.modulo.create({
-      data: { nombre: "Modulo A", contenidoTeorico: "c", orden: 1 },
-    });
-    const moduloB = await prismaTest.modulo.create({
-      data: { nombre: "Modulo B", contenidoTeorico: "c", orden: 2 },
-    });
+    const moduloA = await crearModuloEnBd({ nombre: "Modulo A", orden: 1 });
+    const moduloB = await crearModuloEnBd({ nombre: "Modulo B", orden: 2 });
     await prismaTest.rutaAprendizaje.create({
       data: {
         idUsuario: estudiante.idUsuario,

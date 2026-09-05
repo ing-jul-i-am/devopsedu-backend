@@ -149,10 +149,10 @@ model RutaAprendizaje {
 }
 
 model Modulo {
-  idModulo         Int    @id @default(autoincrement()) @map("id_modulo")
-  nombre           String @db.VarChar(160)
-  contenidoTeorico String @map("contenido_teorico") @db.Text
-  orden            Int
+  idModulo  Int    @id @default(autoincrement()) @map("id_modulo")
+  nombre    String @db.VarChar(160)
+  contenido Json
+  orden     Int
 
   rutaModulos RutaModulo[]
   actividades Actividad[]

@@ -11,7 +11,7 @@ function aModuloRespuesta(modulo: Modulo) {
   return {
     idModulo: modulo.idModulo,
     nombre: modulo.nombre,
-    contenidoTeorico: modulo.contenidoTeorico,
+    contenido: modulo.contenido,
     orden: modulo.orden,
   };
 }

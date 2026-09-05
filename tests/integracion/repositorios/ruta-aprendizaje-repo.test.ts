@@ -7,11 +7,10 @@ import { RutaAprendizajeRepo } from "@/repositorios/ruta-aprendizaje-repo.js";
 import { prismaTest } from "../../ayudas/prisma-test.js";
 import { limpiarBd } from "../../ayudas/limpiar-bd.js";
 import { crearUsuarioEnBd } from "../../fixtures/usuario.factory.js";
+import { crearModuloEnBd } from "../../fixtures/modulo.factory.js";
 
 async function crearModulo(orden: number) {
-  return prismaTest.modulo.create({
-    data: { nombre: `Modulo ${orden}`, contenidoTeorico: "c", orden },
-  });
+  return crearModuloEnBd({ nombre: `Modulo ${orden}`, orden });
 }
 
 describe("RutaAprendizajeRepo", () => {
