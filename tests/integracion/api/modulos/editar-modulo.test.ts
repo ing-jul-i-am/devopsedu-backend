@@ -8,6 +8,10 @@ import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
 import { crearUsuarioConRol } from "../../../ayudas/crear-usuario-con-rol.js";
+import {
+  crearModuloEnBd,
+  datosModuloValidos,
+} from "../../../fixtures/modulo.factory.js";
 
 const DOCENTE = {
   nombre: "Prof. Ana",
@@ -42,9 +46,7 @@ describe("PUT /api/modulos/:idModulo", () => {
 
   it("aplica los cambios y devuelve 200 cuando el modulo existe", async () => {
     // Arrange
-    const modulo = await prismaTest.modulo.create({
-      data: { nombre: "Redes", contenidoTeorico: "c", orden: 1 },
-    });
+    const modulo = await crearModuloEnBd({ nombre: "Redes" });
     await crearUsuarioConRol(DOCENTE, "docente");
     const token = await obtenerToken(DOCENTE);
 
@@ -59,7 +61,7 @@ describe("PUT /api/modulos/:idModulo", () => {
     expect(respuesta.body).toMatchObject({
       nombre: "Redes en Docker",
       orden: 2,
-      contenidoTeorico: "c",
+      contenido: datosModuloValidos().contenido,
     });
   });
 
@@ -80,9 +82,7 @@ describe("PUT /api/modulos/:idModulo", () => {
 
   it("rechaza con 403 cuando el usuario es estudiante", async () => {
     // Arrange
-    const modulo = await prismaTest.modulo.create({
-      data: { nombre: "Redes", contenidoTeorico: "c", orden: 1 },
-    });
+    const modulo = await crearModuloEnBd({ nombre: "Redes" });
     await crearUsuarioConRol(ESTUDIANTE, "estudiante");
     const token = await obtenerToken(ESTUDIANTE);
 
@@ -98,9 +98,7 @@ describe("PUT /api/modulos/:idModulo", () => {
 
   it("rechaza con 400 cuando los datos son invalidos", async () => {
     // Arrange
-    const modulo = await prismaTest.modulo.create({
-      data: { nombre: "Redes", contenidoTeorico: "c", orden: 1 },
-    });
+    const modulo = await crearModuloEnBd({ nombre: "Redes" });
     await crearUsuarioConRol(DOCENTE, "docente");
     const token = await obtenerToken(DOCENTE);
 

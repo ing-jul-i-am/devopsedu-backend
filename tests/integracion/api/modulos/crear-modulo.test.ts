@@ -8,6 +8,12 @@ import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
 import { crearUsuarioConRol } from "../../../ayudas/crear-usuario-con-rol.js";
+import {
+  bloqueEnlace,
+  bloqueImagen,
+  bloqueTexto,
+  datosModuloValidos,
+} from "../../../fixtures/modulo.factory.js";
 
 const DOCENTE = {
   nombre: "Prof. Ana",
@@ -20,15 +26,6 @@ const ESTUDIANTE = {
   correo: "luis@devopsedu.local",
   contrasena: "Clave_segura_1",
 };
-
-function datosModuloValidos(sobrescribir: Record<string, unknown> = {}) {
-  return {
-    nombre: "Introduccion a contenedores",
-    contenidoTeorico: "Los contenedores empaquetan una aplicacion y sus dependencias.",
-    orden: 1,
-    ...sobrescribir,
-  };
-}
 
 describe("POST /api/modulos", () => {
   const app = construirApp();
@@ -64,6 +61,23 @@ describe("POST /api/modulos", () => {
     expect(respuesta.status).toBe(201);
     expect(respuesta.body).toMatchObject(datosModuloValidos());
     expect(respuesta.body.idModulo).toEqual(expect.any(Number));
+  });
+
+  it("acepta un contenido con los tres tipos de bloque", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+    const contenido = [bloqueTexto(), bloqueImagen(), bloqueEnlace()];
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(datosModuloValidos({ contenido }));
+
+    // Assert
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.contenido).toEqual(contenido);
   });
 
   it("rechaza con 403 cuando el usuario es estudiante", async () => {
@@ -105,5 +119,78 @@ describe("POST /api/modulos", () => {
     // Assert
     expect(respuesta.status).toBe(400);
     expect(respuesta.body.detalles).toBeDefined();
+  });
+
+  it("rechaza con 400 cuando el contenido es un arreglo vacio", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(datosModuloValidos({ contenido: [] }));
+
+    // Assert
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.detalles).toBeDefined();
+  });
+
+  it("rechaza con 400 cuando un bloque tiene un tipo no reconocido", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(
+        datosModuloValidos({
+          contenido: [{ tipo: "video", url: "x" } as never],
+        })
+      );
+
+    // Assert
+    expect(respuesta.status).toBe(400);
+  });
+
+  it("rechaza con 400 cuando un bloque de imagen no trae url", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(
+        datosModuloValidos({
+          contenido: [{ tipo: "imagen" } as never],
+        })
+      );
+
+    // Assert
+    expect(respuesta.status).toBe(400);
+  });
+
+  it("rechaza con 400 cuando un bloque de enlace no trae titulo", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(
+        datosModuloValidos({
+          contenido: [{ tipo: "enlace", url: "https://docs.docker.com/" } as never],
+        })
+      );
+
+    // Assert
+    expect(respuesta.status).toBe(400);
   });
 });

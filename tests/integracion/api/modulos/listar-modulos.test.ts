@@ -8,6 +8,7 @@ import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
 import { crearUsuarioConRol } from "../../../ayudas/crear-usuario-con-rol.js";
+import { crearModuloEnBd } from "../../../fixtures/modulo.factory.js";
 
 const DOCENTE = {
   nombre: "Prof. Ana",
@@ -42,12 +43,8 @@ describe("GET /api/modulos", () => {
 
   it("devuelve 200 con los modulos ordenados por 'orden' ascendente", async () => {
     // Arrange
-    await prismaTest.modulo.create({
-      data: { nombre: "Tercero", contenidoTeorico: "c", orden: 3 },
-    });
-    await prismaTest.modulo.create({
-      data: { nombre: "Primero", contenidoTeorico: "c", orden: 1 },
-    });
+    await crearModuloEnBd({ nombre: "Tercero", orden: 3 });
+    await crearModuloEnBd({ nombre: "Primero", orden: 1 });
     await crearUsuarioConRol(DOCENTE, "docente");
     const token = await obtenerToken(DOCENTE);
 
