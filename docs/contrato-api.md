@@ -22,6 +22,8 @@ base de datos y resincroniza automaticamente (ver 3.6):
 - Etapa 6 (RF-22, CU-13): se agrega `GET /api/aprendizaje/mi-ruta`, exclusivo
   del rol estudiante, para consultar la ruta asignada y su progreso. Ver
   seccion 6.
+- DT-08: se agrega el grupo `/api/usuarios`, exclusivo del rol docente, con
+  un unico endpoint de reseteo manual de contrasena. Ver seccion 7.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -603,7 +605,43 @@ ningun endpoint; queda en `0` hasta que se implemente RF-23/RF-24).
 
 ---
 
-## 7. Recursos del servidor — `/api/servidor`
+## 7. Usuarios — `/api/usuarios`
+
+Recurso agregado por DT-08, fuera del catalogo formal de RF (no hay un RF de
+reseteo administrativo de contrasena). Todas las rutas requieren autenticacion
+y estan restringidas al rol `docente` (`autorizar("docente")`); un estudiante
+recibe `403`. Reutiliza el mecanismo transversal de RF-04.
+
+### 7.1 `PATCH /api/usuarios/:id/contrasena`
+
+Reemplaza directamente la contrasena del usuario indicado por `:id`. No exige
+la contrasena anterior, no envia confirmacion ni notifica al usuario afectado:
+es una funcion minima pensada para uso durante el desarrollo (ver DT-08 para
+el contexto y las limitaciones aceptadas).
+
+**Request body**
+
+```json
+{ "contrasenaNueva": "string no vacio" }
+```
+
+**Response `200 OK`**
+
+```json
+{ "mensaje": "Contrasena actualizada" }
+```
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido: falta `contrasenaNueva` o es una cadena vacia (ver 1.4) |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `UsuarioNoEncontradoError` — no existe un usuario con ese id |
+
+---
+
+## 8. Recursos del servidor — `/api/servidor`
 
 Cubre RF-10 — CU-04. Requiere solo autenticacion (`autenticar`), sin restriccion de
 rol adicional (cualquier usuario autenticado, estudiante o docente).
@@ -629,7 +667,7 @@ servicio: reflejan el uso de toda la maquina (SO, otros procesos, contenedores D
 
 ---
 
-## 8. Catalogo de errores de dominio
+## 9. Catalogo de errores de dominio
 
 Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 `evento` que registran en bitacora (irrelevante para el frontend salvo como contexto).
@@ -642,16 +680,17 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `ServicioNoEncontradoError` | 404 | `Servicio no encontrado` | — |
 | `ModuloNoEncontradoError` | 404 | `Modulo no encontrado` | — |
 | `ContenedorNoEncontradoError` | 404 | `El contenedor del servicio no existe` | — |
+| `UsuarioNoEncontradoError` | 404 | `Usuario no encontrado` | — |
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
-| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 8.2) |
+| `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 9.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
 | `RolNoDisponibleError` | 500 | Se responde con el mensaje generico `Error interno del servidor` (el mensaje real no se expone) | — |
 | Cualquier otro error no controlado | 500 | `Error interno del servidor` | — |
 
-### 8.2 Forma extendida de `RecursosInsuficientesError` (422)
+### 9.2 Forma extendida de `RecursosInsuficientesError` (422)
 
 ```json
 {
@@ -663,11 +702,15 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 
 ---
 
-## 9. Pendiente / fuera de alcance de este contrato
+## 10. Pendiente / fuera de alcance de este contrato
 
 No implementado aun en el backend (no invocar desde el frontend todavia):
 
-- `PUT /api/usuarios/*` (gestion de perfil, RF-04)
+- Gestion de perfil propio del usuario (RF-04 como endpoint de autoservicio, p. ej.
+  `GET/PUT /api/usuarios/yo`). El unico endpoint implementado en `/api/usuarios` es
+  el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
+- Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
+  DT-08 para la relacion con el reseteo administrativo actual).
 - Resto de `/api/aprendizaje/*` (estudiante, RF-23, RF-24, CU-12, CU-14): solo
   `GET /api/aprendizaje/mi-ruta` (RF-22, CU-13) esta implementado, ver seccion 6.
 - `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16)

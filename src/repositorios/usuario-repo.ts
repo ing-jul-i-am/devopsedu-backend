@@ -37,4 +37,14 @@ export class UsuarioRepo {
       include: { rol: true },
     });
   }
+
+  async actualizarContrasena(
+    idUsuario: number,
+    contrasenaCifrada: string
+  ): Promise<Usuario> {
+    return this.prisma.usuario.update({
+      where: { idUsuario },
+      data: { contrasenaCifrada },
+    });
+  }
 }

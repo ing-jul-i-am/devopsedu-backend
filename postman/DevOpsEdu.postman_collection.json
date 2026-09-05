@@ -27,7 +27,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -35,8 +38,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/registro",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "registro"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
             },
             "description": "RF-01: auto-registro. El rol se asigna en el servidor (estudiante) y nunca se acepta desde el cliente."
           }
@@ -63,7 +71,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -71,8 +82,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "RF-02: inicio de sesion. Guarda el token emitido en la variable de ambiente tokenEstudiante."
           }
@@ -98,7 +114,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -106,8 +125,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Usa el usuario docente creado por prisma/seed.ts. La contrasena depende de ADMIN_PASSWORD_INICIAL en el .env usado al sembrar la base (por defecto 'cambiar_en_primer_ingreso'). Ajustar la variable contrasenaDocente si difiere."
           }
@@ -117,13 +141,24 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "" },
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{baseUrl}}/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "logout"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
             },
             "description": "RF-03: revoca la sesion asociada al token (tabla sesion)."
           }
@@ -138,12 +173,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servidor/capacidad",
-              "host": ["{{baseUrl}}"],
-              "path": ["servidor", "capacidad"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servidor",
+                "capacidad"
+              ]
             },
             "description": "RF-10 / CU-04: capacidad total, comprometida y disponible, medida en tiempo real sobre el sistema operativo (DT-06)."
           }
@@ -158,12 +201,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servicios/imagenes",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "imagenes"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "imagenes"
+              ]
             },
             "description": "RF-07: catalogo curado de imagenes Docker sugeridas."
           }
@@ -189,8 +240,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -198,8 +255,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/servicios",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
             },
             "description": "RF-05, RF-06: creacion de un servicio con su configuracion inicial. Guarda idServicio automaticamente para los siguientes requests."
           }
@@ -209,12 +270,19 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servicios",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
             },
             "description": "RF-16: panel de servicios del usuario autenticado."
           }
@@ -224,12 +292,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}"
+              ]
             },
             "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue)."
           }
@@ -239,8 +315,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -248,8 +330,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}/configuracion",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}", "configuracion"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}",
+                "configuracion"
+              ]
             },
             "description": "RF-08: crea un nuevo registro de configuracion (historico 1:N, ver DT-04); no sobrescribe el anterior."
           }
@@ -259,13 +347,25 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "" },
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}/desplegar",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}", "desplegar"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}",
+                "desplegar"
+              ]
             },
             "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend."
           }
@@ -275,15 +375,32 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}/metricas",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}", "metricas"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}",
+                "metricas"
+              ],
               "query": [
-                { "key": "desde", "value": "", "disabled": true },
-                { "key": "hasta", "value": "", "disabled": true }
+                {
+                  "key": "desde",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "hasta",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             },
             "description": "RF-18: historico de metricas de consumo (recolectadas por MonitorPeriodico mientras el servicio esta en_ejecucion). Admite filtro opcional por rango de fechas (desde/hasta)."
@@ -294,13 +411,25 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "" },
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}/detener",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}", "detener"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}",
+                "detener"
+              ]
             },
             "description": "RF-12: solo valido desde el estado en_ejecucion (maquina de estados 4.2.14)."
           }
@@ -310,13 +439,25 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "" },
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}/reiniciar",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}", "reiniciar"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}",
+                "reiniciar"
+              ]
             },
             "description": "RF-13: valido desde detenido, en_ejecucion o fallido (RF-19: permite recuperar un servicio marcado fallido cuyo contenedor sigue existiendo, por ejemplo tras detectarse que se detuvo fuera de la plataforma)."
           }
@@ -326,12 +467,20 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/servicios/{{idServicio}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "{{idServicio}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicio}}"
+              ]
             },
             "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico."
           }
@@ -362,8 +511,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -371,8 +526,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
-              "host": ["{{baseUrl}}"],
-              "path": ["modulos"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
             },
             "description": "RF-20 / CU-10: creacion de un modulo de aprendizaje. Exclusivo del rol docente. Guarda idModulo1 automaticamente."
           }
@@ -398,8 +557,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -407,8 +572,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
-              "host": ["{{baseUrl}}"],
-              "path": ["modulos"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
             },
             "description": "RF-20 / CU-10: segundo modulo, para poder demostrar el orden de una ruta de aprendizaje con mas de un modulo. Guarda idModulo2 automaticamente."
           }
@@ -418,12 +587,19 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/modulos",
-              "host": ["{{baseUrl}}"],
-              "path": ["modulos"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
             },
             "description": "RF-20 / CU-10: lista todos los modulos, ordenados por 'orden' ascendente. Exclusivo del rol docente."
           }
@@ -433,8 +609,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -442,8 +624,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/modulos/{{idModulo1}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["modulos", "{{idModulo1}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "{{idModulo1}}"
+              ]
             },
             "description": "RF-20 / CU-10: edicion parcial de un modulo existente; solo se actualizan los campos enviados."
           }
@@ -474,8 +661,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -483,8 +676,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/rutas",
-              "host": ["{{baseUrl}}"],
-              "path": ["rutas"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rutas"
+              ]
             },
             "description": "RF-21 / CU-11: asigna al estudiante una ruta de aprendizaje con los modulos en el orden del arreglo (aqui, primero Redes en Docker y luego Introduccion a contenedores, a proposito para demostrar que ordenSecuencia sigue el orden recibido, no el campo 'orden' del modulo). Exclusivo del rol docente. Requiere haber corrido antes Login estudiante y los dos requests de Crear modulo."
           }
@@ -499,14 +696,73 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/aprendizaje/mi-ruta",
-              "host": ["{{baseUrl}}"],
-              "path": ["aprendizaje", "mi-ruta"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "aprendizaje",
+                "mi-ruta"
+              ]
             },
             "description": "RF-22 / CU-13: ruta de aprendizaje mas reciente asignada al estudiante autenticado, con sus modulos ordenados y el progreso (0 hasta que se implementen RF-23/RF-24). Devuelve null si aun no se le asigno ninguna ruta. Exclusivo del rol estudiante."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Resetear contrasena de estudiante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 contrasena actualizada', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.environment.set('contrasenaEstudiante', pm.environment.get('contrasenaNuevaEstudiante'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasenaNueva\": \"{{contrasenaNuevaEstudiante}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{idUsuarioEstudiante}}/contrasena",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{idUsuarioEstudiante}}",
+                "contrasena"
+              ]
+            },
+            "description": "DT-08: reseteo administrativo de la contrasena de un usuario por el rol docente. No exige la contrasena anterior ni ninguna otra validacion de seguridad; pensado para uso durante el desarrollo. Actualiza contrasenaEstudiante para que los siguientes logins de la coleccion sigan funcionando."
           }
         }
       ]
@@ -519,7 +775,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -527,8 +786,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Debe responder 401 sin exponer si el correo existe (RNF-12)."
           }
@@ -538,7 +802,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -546,8 +813,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/servicios",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
             },
             "description": "El middleware autenticar debe rechazar la peticion antes de llegar al controlador."
           }
@@ -557,8 +828,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -566,8 +843,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/servicios",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
             },
             "description": "El validador Zod (crearServicioSchema) rechaza el cuerpo antes de llegar al servicio de aplicacion."
           }
@@ -577,13 +858,25 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "" },
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{baseUrl}}/servicios/999999/desplegar",
-              "host": ["{{baseUrl}}"],
-              "path": ["servicios", "999999", "desplegar"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "999999",
+                "desplegar"
+              ]
             },
             "description": "ServicioNoEncontradoError -> 404."
           }
@@ -593,8 +886,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenEstudiante}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -602,8 +901,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
-              "host": ["{{baseUrl}}"],
-              "path": ["modulos"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
             },
             "description": "RF-04 / DT-03: el middleware autorizar('docente') debe rechazar con PermisoDenegadoError -> 403 antes de llegar al controlador."
           }
@@ -613,8 +916,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenDocente}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -622,16 +931,55 @@
             },
             "url": {
               "raw": "{{baseUrl}}/rutas",
-              "host": ["{{baseUrl}}"],
-              "path": ["rutas"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rutas"
+              ]
             },
             "description": "ModuloNoEncontradoError -> 404. GestorRutas verifica cada idModulo antes de persistir la ruta."
+          }
+        },
+        {
+          "name": "Resetear contrasena como estudiante -> 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasenaNueva\": \"OtraClave123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{idUsuarioEstudiante}}/contrasena",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{idUsuarioEstudiante}}",
+                "contrasena"
+              ]
+            },
+            "description": "DT-08: el endpoint de reseteo de contrasena esta restringido al rol docente; un estudiante recibe 403."
           }
         }
       ]
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000/api" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    }
   ]
 }

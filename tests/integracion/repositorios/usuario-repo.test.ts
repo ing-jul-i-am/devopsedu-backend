@@ -123,4 +123,31 @@ describe("UsuarioRepo", () => {
       expect(encontrado).toBeNull();
     });
   });
+
+  describe("actualizarContrasena", () => {
+    it("reemplaza el hash de la contrasena del usuario", async () => {
+      // Arrange
+      const creado = await crearUsuarioEnBd({ contrasenaCifrada: "hash_viejo" });
+
+      // Act
+      const actualizado = await repo.actualizarContrasena(
+        creado.idUsuario,
+        "hash_nuevo"
+      );
+
+      // Assert
+      expect(actualizado.contrasenaCifrada).toBe("hash_nuevo");
+      const enBd = await prismaTest.usuario.findUnique({
+        where: { idUsuario: creado.idUsuario },
+      });
+      expect(enBd?.contrasenaCifrada).toBe("hash_nuevo");
+    });
+
+    it("rechaza cuando el usuario no existe", async () => {
+      // Act + Assert
+      await expect(
+        repo.actualizarContrasena(999_999, "hash_nuevo")
+      ).rejects.toThrow();
+    });
+  });
 });

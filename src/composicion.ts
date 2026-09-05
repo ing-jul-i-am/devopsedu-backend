@@ -25,6 +25,7 @@ import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
 import { GestorModulos } from "./servicios-aplicacion/gestor-modulos.js";
 import { GestorRutas } from "./servicios-aplicacion/gestor-rutas.js";
 import { GestorAprendizaje } from "./servicios-aplicacion/gestor-aprendizaje.js";
+import { GestorUsuarios } from "./servicios-aplicacion/gestor-usuarios.js";
 import { MonitorPeriodico } from "./docker/monitor-periodico.js";
 import { crearAutenticar } from "./api/middlewares/autenticar.js";
 import { crearCors } from "./api/middlewares/cors.js";
@@ -98,6 +99,7 @@ export function construirDependencias(
   const gestorAprendizaje = new GestorAprendizaje({
     rutaRepo: rutaAprendizajeRepo,
   });
+  const gestorUsuarios = new GestorUsuarios({ usuarioRepo, cifrador });
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });
   const cors = crearCors(config.corsOrigenes);
@@ -116,6 +118,7 @@ export function construirDependencias(
     gestorModulos,
     gestorRutas,
     gestorAprendizaje,
+    gestorUsuarios,
     verificador,
     autenticar,
     cors,

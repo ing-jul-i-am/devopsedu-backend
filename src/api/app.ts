@@ -11,12 +11,14 @@ import type { VerificadorRecursos } from "../servicios-aplicacion/verificador-re
 import type { GestorModulos } from "../servicios-aplicacion/gestor-modulos.js";
 import type { GestorRutas } from "../servicios-aplicacion/gestor-rutas.js";
 import type { GestorAprendizaje } from "../servicios-aplicacion/gestor-aprendizaje.js";
+import type { GestorUsuarios } from "../servicios-aplicacion/gestor-usuarios.js";
 import { crearRutasAuth } from "./rutas/auth.rutas.js";
 import { crearRutasServicios } from "./rutas/servicios.rutas.js";
 import { crearRutasServidor } from "./rutas/servidor.rutas.js";
 import { crearRutasModulos } from "./rutas/modulos.rutas.js";
 import { crearRutasRutasAprendizaje } from "./rutas/rutas.rutas.js";
 import { crearRutasAprendizaje } from "./rutas/aprendizaje.rutas.js";
+import { crearRutasUsuarios } from "./rutas/usuarios.rutas.js";
 import { manejadorErrores } from "./middlewares/manejador-errores.js";
 
 export interface DependenciasApp {
@@ -27,6 +29,7 @@ export interface DependenciasApp {
   gestorModulos: GestorModulos;
   gestorRutas: GestorRutas;
   gestorAprendizaje: GestorAprendizaje;
+  gestorUsuarios: GestorUsuarios;
   autenticar: RequestHandler;
   cors: RequestHandler;
 }
@@ -61,6 +64,10 @@ export function crearApp(dependencias: DependenciasApp): Express {
   app.use(
     "/api/aprendizaje",
     crearRutasAprendizaje(dependencias.gestorAprendizaje, dependencias.autenticar)
+  );
+  app.use(
+    "/api/usuarios",
+    crearRutasUsuarios(dependencias.gestorUsuarios, dependencias.autenticar)
   );
 
   // El manejador de errores se registra al final, tras todas las rutas.

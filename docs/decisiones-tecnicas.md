@@ -98,6 +98,10 @@ la prueba de aceptacion end-to-end de RF-04 se redacta al construir los endpoint
 - Crear `GET /api/usuarios/yo` o `GET /api/usuarios`. Descartadas por no ser requeridas por
   RF-04 ni por ningun otro RF del catalogo en esta etapa (evita alcance especulativo).
 
+**Nota posterior (2026-09-05):** DT-08 crea `/api/usuarios` con un endpoint concreto (reseteo
+de contrasena por el docente), ante una necesidad real y ya no especulativa. La gestion de
+perfil propio (`GET/PUT /api/usuarios/yo`) sigue sin implementarse y sigue sin RF asociado.
+
 ---
 
 ## DT-04: ConfiguracionServicio pasa a 1:N (historico de configuraciones) para cumplir RF-08
@@ -223,3 +227,51 @@ sutiles (RNF-15).
 - Middleware CORS escrito a mano sin dependencia nueva. Descartada por el riesgo de omitir
   detalles del protocolo (encabezado `Vary: Origin`, manejo de `Access-Control-Request-Headers`
   dinamico) que el paquete `cors` ya resuelve de forma probada.
+
+---
+
+## DT-08: se agrega `/api/usuarios` para el reseteo manual de contrasena por el docente
+
+**Fecha:** 2026-09-05
+
+**Contexto:** Durante el desarrollo, el desarrollador perdio el registro de las contrasenas en
+texto plano de varios usuarios de prueba. Al ser bcrypt un cifrado de una sola via (RNF-10), no
+existe forma de recuperarlas desde el hash almacenado. Se solicito una via operativa para
+resetear la contrasena de un usuario conociendo su id, pensada para uso durante el desarrollo y
+como base de un futuro flujo de "olvide mi contrasena" (visible en el mockup de la vista de
+login del diseño, seccion 4.2, aunque sin RF asignado en el catalogo).
+
+Esto reabre la decision DT-03, que descartaba explicitamente crear un recurso `/api/usuarios`
+por considerarlo alcance especulativo. Aqui el alcance deja de ser especulativo: hay una
+necesidad concreta y vigente.
+
+**Decision:** Se crea el recurso `PATCH /api/usuarios/:id/contrasena`, restringido al rol
+docente mediante los middlewares transversales ya existentes (`autenticar` + `autorizar`,
+mecanismo de RF-04). El endpoint recibe unicamente `contrasenaNueva` en el cuerpo; no implementa
+ninguna verificacion adicional (sin correo de confirmacion, sin token temporal, sin exigir la
+contrasena anterior) porque el requerimiento explicito del desarrollador fue una funcion minima
+de actualizacion directa. El nuevo `GestorUsuarios` (`src/servicios-aplicacion/gestor-usuarios.ts`)
+verifica que el usuario exista, cifra la contrasena con `Cifrador` (bcrypt, 12 rondas) y delega en
+`UsuarioRepo.actualizarContrasena`.
+
+No se asocia a ningun RF del catalogo por no existir uno que cubra el reseteo administrativo de
+contrasena; se documenta como decision tecnica siguiendo el skill `trazabilidad-requerimientos`
+seccion 7. Se referencia informalmente junto a RF-04 en las cabeceras de codigo porque comparte
+su mecanismo de autorizacion por rol, no porque el catalogo lo defina.
+
+**Consecuencias:** Cualquier cuenta docente puede cambiar la contrasena de cualquier otro
+usuario sin que este lo solicite ni lo confirme. Es aceptable para la etapa actual de desarrollo,
+pero antes de un uso en produccion se deberia, como minimo: registrar el evento en bitacora
+(RNF-14, hoy no implementado para este endpoint), y evaluar si conviene exigir un motivo o
+notificar al usuario afectado. Si mas adelante se construye el flujo de autoservicio
+"olvide mi contrasena", debera vivir en un endpoint distinto (no exige rol docente ni recibe el
+id por URL) y probablemente reemplace este por uno mas restringido.
+
+**Alternativas consideradas:**
+- Mantener DT-03 y resolver la perdida de contrasenas unicamente reseteando datos a mano en la
+  base de pruebas (`UPDATE` directo o script puntual fuera del ciclo TDD). Descartada porque el
+  desarrollador pidio explicitamente una via reutilizable a traves de la API.
+- Ubicar el endpoint en `/api/auth/resetear-contrasena` en vez de crear el recurso
+  `/api/usuarios`. Descartada en favor de `/api/usuarios` porque el contrato ya anticipaba ese
+  recurso como pendiente (`docs/contrato-api.md`, seccion 9) y porque la operacion actua sobre
+  un usuario identificado por id, no sobre la sesion de quien invoca.
