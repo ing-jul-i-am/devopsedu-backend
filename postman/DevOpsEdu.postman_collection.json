@@ -491,6 +491,101 @@
       "name": "Modulos",
       "item": [
         {
+          "name": "Subir imagen de modulo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 imagen subida', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('url');",
+                  "    pm.environment.set('urlImagenModulo', datos.url);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imagen",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos/imagenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "imagenes"
+              ]
+            },
+            "description": "RF-20 / CU-10 (DT-09): sube una imagen (PNG/JPEG/WEBP/GIF, maximo 5 MB) para referenciarla luego desde un bloque de tipo 'imagen'. Selecciona un archivo local en el campo 'imagen' antes de enviar. Guarda urlImagenModulo automaticamente."
+          }
+        },
+        {
+          "name": "Crear modulo: Imagenes en Docker (bloques mixtos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 modulo creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('idModulo');",
+                  "    pm.environment.set('idModulo3', datos.idModulo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Imagenes en Docker\",\n  \"contenido\": [\n    {\n      \"tipo\": \"texto\",\n      \"contenido\": \"Las imagenes son los objetos tipo 'clase' de programas, aplicaciones o servicios que luego se 'instancian' en forma de contenedores.\"\n    },\n    {\n      \"tipo\": \"imagen\",\n      \"url\": \"{{urlImagenModulo}}\",\n      \"textoAlternativo\": \"Diagrama de capas de una imagen Docker\"\n    },\n    {\n      \"tipo\": \"enlace\",\n      \"url\": \"https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/\",\n      \"titulo\": \"Documentacion oficial: que es una imagen Docker\",\n      \"descripcion\": \"Referencia externa para ampliar el modulo\"\n    }\n  ],\n  \"orden\": 3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
+            },
+            "description": "RF-20 / CU-10 (DT-09): demuestra un modulo con los tres tipos de bloque de contenido (texto, imagen y enlace). Ejecutar 'Subir imagen de modulo' antes para poblar {{urlImagenModulo}}."
+          }
+        },
+        {
           "name": "Crear modulo: Introduccion a contenedores",
           "event": [
             {
@@ -522,7 +617,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Introduccion a contenedores\",\n  \"contenidoTeorico\": \"Los contenedores empaquetan una aplicacion y sus dependencias en una unidad ejecutable aislada.\",\n  \"orden\": 1\n}"
+              "raw": "{\n  \"nombre\": \"Introduccion a contenedores\",\n  \"contenido\": [\n    {\n      \"tipo\": \"texto\",\n      \"contenido\": \"Los contenedores empaquetan una aplicacion y sus dependencias en una unidad ejecutable aislada.\"\n    }\n  ],\n  \"orden\": 1\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
@@ -568,7 +663,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Redes en Docker\",\n  \"contenidoTeorico\": \"Docker crea redes virtuales para que los contenedores se comuniquen entre si de forma aislada.\",\n  \"orden\": 2\n}"
+              "raw": "{\n  \"nombre\": \"Redes en Docker\",\n  \"contenido\": [\n    {\n      \"tipo\": \"texto\",\n      \"contenido\": \"Docker crea redes virtuales para que los contenedores se comuniquen entre si de forma aislada.\"\n    }\n  ],\n  \"orden\": 2\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
@@ -897,7 +992,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Intento no autorizado\",\n  \"contenidoTeorico\": \"c\",\n  \"orden\": 1\n}"
+              "raw": "{\n  \"nombre\": \"Intento no autorizado\",\n  \"contenido\": [\n    {\n      \"tipo\": \"texto\",\n      \"contenido\": \"c\"\n    }\n  ],\n  \"orden\": 1\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/modulos",
