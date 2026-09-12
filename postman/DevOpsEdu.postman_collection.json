@@ -700,6 +700,29 @@
           }
         },
         {
+          "name": "Obtener modulo por id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modulos/{{idModulo1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "{{idModulo1}}"
+              ]
+            },
+            "description": "RF-20 / CU-10: devuelve un modulo individual con su contenido completo (bloques crudos, sin enriquecer). Exclusivo del rol docente."
+          }
+        },
+        {
           "name": "Editar modulo",
           "request": {
             "method": "PUT",
@@ -903,6 +926,30 @@
               ]
             },
             "description": "RF-22 / CU-13: ruta de aprendizaje mas reciente asignada al estudiante autenticado, con sus modulos ordenados y el progreso (actualizado por EvaluadorActividad al completar actividades, ver RF-23 / DT-10). Devuelve null si aun no se le asigno ninguna ruta. Exclusivo del rol estudiante."
+          }
+        },
+        {
+          "name": "Consultar contenido del modulo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/aprendizaje/modulos/{{idModulo1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "aprendizaje",
+                "modulos",
+                "{{idModulo1}}"
+              ]
+            },
+            "description": "RF-23 / CU-12: devuelve el contenido del modulo (bloques texto/imagen/enlace/actividad) cuando pertenece a la ruta activa del estudiante. Los bloques de actividad se enriquecen con su descripcion, sin exponer criteriosValidacion. Exclusivo del rol estudiante."
           }
         },
         {

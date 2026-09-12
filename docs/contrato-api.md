@@ -510,6 +510,20 @@ Lista todos los modulos existentes, ordenados por `orden` ascendente.
 
 **Errores posibles**: `401`, `403`.
 
+### 4.2b `GET /api/modulos/:idModulo`
+
+Devuelve un modulo individual con su `contenido` completo (los bloques crudos,
+sin enriquecer — el docente ya conoce sus propias actividades).
+
+**Response `200 OK`**: objeto Modulo (seccion 4.1).
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoEncontradoError` — no existe un modulo con ese id |
+
 ### 4.3 `POST /api/modulos`
 
 **Request body**
@@ -766,6 +780,40 @@ total de evaluaciones de la ruta) * 100`.
 **Response `200 OK`** (sin ninguna ruta asignada todavia): `null`.
 
 **Errores posibles**: `401`, `403`.
+
+### 6.1b `GET /api/aprendizaje/modulos/:idModulo`
+
+Devuelve el contenido de un modulo asignado a la ruta activa del estudiante
+(RF-23, ver DT-10). Los bloques `texto`, `imagen` y `enlace` se devuelven tal
+cual (ver 4.1); cada bloque `actividad` se enriquece con la `descripcion` de la
+actividad referenciada, para que el frontend no necesite otra llamada.
+Deliberadamente **no** incluye `criteriosValidacion`: es informacion de
+validacion automatica, no contenido educativo.
+
+**Response `200 OK`**
+
+```json
+{
+  "idModulo": 3,
+  "nombre": "Redes en Docker",
+  "orden": 1,
+  "fechaInicio": "2026-08-28T10:00:00.000Z",
+  "contenido": [
+    { "tipo": "texto", "contenido": "Los contenedores empaquetan una aplicacion y sus dependencias (Markdown)." },
+    { "tipo": "actividad", "idActividad": 7, "descripcion": "Despliega un servicio con nginx y al menos un volumen" }
+  ]
+}
+```
+
+`fechaInicio` es `null` si el estudiante aun no ha llamado a 6.2 para este
+modulo.
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoAsignadoError` — el `idModulo` no pertenece a la ruta activa del estudiante (o no tiene ninguna ruta asignada) |
 
 ### 6.2 `POST /api/aprendizaje/modulos/:idModulo/iniciar`
 
