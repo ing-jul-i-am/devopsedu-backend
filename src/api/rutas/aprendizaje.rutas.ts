@@ -19,6 +19,7 @@ export function crearRutasAprendizaje(
   const rol = autorizar("estudiante");
 
   router.get("/mi-ruta", autenticar, rol, c.miRuta);
+  router.get("/modulos/:idModulo", autenticar, rol, c.obtenerModulo);
   router.post("/modulos/:idModulo/iniciar", autenticar, rol, c.iniciarModulo);
   router.get(
     "/modulos/:idModulo/evaluacion",

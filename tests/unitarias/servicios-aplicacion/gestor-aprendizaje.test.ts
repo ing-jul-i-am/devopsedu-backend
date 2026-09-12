@@ -24,6 +24,7 @@ function crearDependenciasMock() {
       existeAprobadaPorUsuarioYEvaluacion: vi.fn(),
     },
     calculadorProgreso: { recalcular: vi.fn() },
+    actividadRepo: { listarPorModulo: vi.fn() },
   };
 }
 
@@ -31,12 +32,26 @@ function crearGestor(dep: ReturnType<typeof crearDependenciasMock>) {
   return new GestorAprendizaje(dep as any);
 }
 
-function rutaConModulo(idModulo = 7, fechaInicio: Date | null = null) {
+function rutaConModulo(
+  idModulo = 7,
+  fechaInicio: Date | null = null,
+  modulo: Record<string, unknown> | undefined = undefined
+) {
   return {
     idRuta: 1,
     idUsuario: 5,
     progreso: 0,
-    rutaModulos: [{ idRuta: 1, idModulo, ordenSecuencia: 1, fechaInicio }],
+    rutaModulos: [{ idRuta: 1, idModulo, ordenSecuencia: 1, fechaInicio, modulo }],
+  };
+}
+
+function moduloDePrueba(parciales: Record<string, unknown> = {}) {
+  return {
+    idModulo: 7,
+    nombre: "Introduccion a contenedores",
+    contenido: [{ tipo: "texto", contenido: "..." }],
+    orden: 1,
+    ...parciales,
   };
 }
 
@@ -121,6 +136,54 @@ describe("GestorAprendizaje.iniciarModulo", () => {
     // Assert
     await expect(intento).rejects.toBeInstanceOf(ModuloNoAsignadoError);
     expect(dep.rutaRepo.marcarInicioModulo).not.toHaveBeenCalled();
+  });
+});
+
+describe("GestorAprendizaje.obtenerModulo", () => {
+  it("devuelve el modulo y sus actividades cuando pertenece a la ruta activa", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(
+      rutaConModulo(7, null, moduloDePrueba())
+    );
+    const actividades = [{ idActividad: 3, descripcion: "Despliega nginx" }];
+    dep.actividadRepo.listarPorModulo.mockResolvedValue(actividades);
+    const gestor = crearGestor(dep);
+
+    // Act
+    const resultado = await gestor.obtenerModulo(5, 7);
+
+    // Assert
+    expect(dep.actividadRepo.listarPorModulo).toHaveBeenCalledWith(7);
+    expect(resultado.modulo).toMatchObject({ idModulo: 7 });
+    expect(resultado.actividades).toBe(actividades);
+  });
+
+  it("lanza ModuloNoAsignadoError cuando el modulo no pertenece a la ruta del estudiante", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(rutaConModulo());
+    const gestor = crearGestor(dep);
+
+    // Act
+    const intento = gestor.obtenerModulo(5, 999);
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ModuloNoAsignadoError);
+    expect(dep.actividadRepo.listarPorModulo).not.toHaveBeenCalled();
+  });
+
+  it("lanza ModuloNoAsignadoError cuando el estudiante no tiene ninguna ruta asignada", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(null);
+    const gestor = crearGestor(dep);
+
+    // Act
+    const intento = gestor.obtenerModulo(5, 7);
+
+    // Assert
+    await expect(intento).rejects.toBeInstanceOf(ModuloNoAsignadoError);
   });
 });
 

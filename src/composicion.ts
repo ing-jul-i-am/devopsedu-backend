@@ -132,6 +132,7 @@ export function construirDependencias(
     evaluacionRepo,
     resultadoRepo,
     calculadorProgreso,
+    actividadRepo,
   });
   const gestorUsuarios = new GestorUsuarios({ usuarioRepo, cifrador });
 

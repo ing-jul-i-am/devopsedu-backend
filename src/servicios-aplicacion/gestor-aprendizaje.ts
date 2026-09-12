@@ -2,13 +2,14 @@
 // Servicio de aplicacion para las acciones del estudiante sobre su propia ruta de aprendizaje.
 // Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
 
-import type { Evaluacion, RutaModulo, Modulo } from "@prisma/client";
+import type { Evaluacion, RutaModulo, Modulo, Actividad } from "@prisma/client";
 import type {
   RutaAprendizajeRepo,
   RutaAprendizajeConModulosDetalle,
 } from "../repositorios/ruta-aprendizaje-repo.js";
 import type { EvaluacionRepo } from "../repositorios/evaluacion-repo.js";
 import type { ResultadoRepo } from "../repositorios/resultado-repo.js";
+import type { ActividadRepo } from "../repositorios/actividad-repo.js";
 import type { CalculadorProgreso } from "./calculador-progreso.js";
 import type { PreguntaEvaluacion } from "../dominio/modelos/pregunta-evaluacion.js";
 import { ModuloNoAsignadoError } from "../dominio/errores/modulo-no-asignado-error.js";
@@ -35,6 +36,13 @@ export interface DependenciasGestorAprendizaje {
     | "existeAprobadaPorUsuarioYEvaluacion"
   >;
   calculadorProgreso: Pick<CalculadorProgreso, "recalcular">;
+  actividadRepo: Pick<ActividadRepo, "listarPorModulo">;
+}
+
+export interface ModuloConActividades {
+  modulo: Modulo;
+  actividades: Actividad[];
+  fechaInicio: Date | null;
 }
 
 export interface RetroalimentacionEvaluacion {
@@ -58,6 +66,22 @@ export class GestorAprendizaje {
   async iniciarModulo(idUsuario: number, idModulo: number): Promise<void> {
     const { ruta } = await this.buscarRutaModulo(idUsuario, idModulo);
     await this.dep.rutaRepo.marcarInicioModulo(ruta.idRuta, idModulo);
+  }
+
+  // RF-23: devuelve el contenido de un modulo asignado a la ruta activa del estudiante, junto
+  // con sus actividades practicas (el controlador las usa para enriquecer los bloques tipo
+  // "actividad" del contenido, ver aprendizaje.controlador.ts).
+  async obtenerModulo(
+    idUsuario: number,
+    idModulo: number
+  ): Promise<ModuloConActividades> {
+    const { rutaModulo } = await this.buscarRutaModulo(idUsuario, idModulo);
+    const actividades = await this.dep.actividadRepo.listarPorModulo(idModulo);
+    return {
+      modulo: rutaModulo.modulo,
+      actividades,
+      fechaInicio: rutaModulo.fechaInicio,
+    };
   }
 
   // RF-24: devuelve la evaluacion del modulo, sin filtrar aun las respuestas correctas (lo hace

@@ -5,10 +5,11 @@
 // Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
 
 import type { RequestHandler, Request } from "express";
-import type { Evaluacion } from "@prisma/client";
-import type { GestorAprendizaje } from "../../../servicios-aplicacion/gestor-aprendizaje.js";
+import type { Evaluacion, Actividad } from "@prisma/client";
+import type { GestorAprendizaje, ModuloConActividades } from "../../../servicios-aplicacion/gestor-aprendizaje.js";
 import type { RutaAprendizajeConModulosDetalle } from "../../../repositorios/ruta-aprendizaje-repo.js";
 import type { PreguntaEvaluacion } from "../../../dominio/modelos/pregunta-evaluacion.js";
+import type { BloqueContenido } from "../../../dominio/modelos/bloque-contenido.js";
 import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ModuloNoAsignadoError } from "../../../dominio/errores/modulo-no-asignado-error.js";
@@ -41,6 +42,37 @@ function aRutaRespuesta(ruta: RutaAprendizajeConModulosDetalle) {
   };
 }
 
+// Enriquece los bloques tipo "actividad" con la descripcion de la actividad para que el
+// frontend no necesite otra llamada. Deliberadamente omite criteriosValidacion: es informacion
+// de validacion automatica, no contenido educativo para el estudiante.
+function aBloqueRespuesta(
+  bloque: BloqueContenido,
+  actividades: Actividad[]
+): BloqueContenido | (Omit<BloqueContenido, "tipo"> & { tipo: "actividad"; descripcion: string }) {
+  if (bloque.tipo !== "actividad") {
+    return bloque;
+  }
+  const actividad = actividades.find((a) => a.idActividad === bloque.idActividad);
+  return {
+    tipo: "actividad",
+    idActividad: bloque.idActividad,
+    descripcion: actividad?.descripcion ?? "",
+  };
+}
+
+function aModuloRespuesta({ modulo, actividades, fechaInicio }: ModuloConActividades) {
+  const contenido = (modulo.contenido as unknown as BloqueContenido[]).map((bloque) =>
+    aBloqueRespuesta(bloque, actividades)
+  );
+  return {
+    idModulo: modulo.idModulo,
+    nombre: modulo.nombre,
+    orden: modulo.orden,
+    fechaInicio,
+    contenido,
+  };
+}
+
 function aEvaluacionRespuesta(evaluacion: Evaluacion) {
   const preguntas = evaluacion.preguntas as unknown as PreguntaEvaluacion[];
   return {
@@ -59,6 +91,7 @@ export function crearControladoresAprendizaje(
 ): {
   miRuta: RequestHandler;
   iniciarModulo: RequestHandler;
+  obtenerModulo: RequestHandler;
   obtenerEvaluacion: RequestHandler;
   responderEvaluacion: RequestHandler;
 } {
@@ -78,6 +111,20 @@ export function crearControladoresAprendizaje(
       const idModulo = idModuloDe(req);
       await gestorAprendizaje.iniciarModulo(usuario.idUsuario, idModulo);
       res.status(200).json({ mensaje: "Modulo iniciado" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  const obtenerModulo: RequestHandler = async (req, res, next) => {
+    try {
+      const usuario = usuarioDe(req);
+      const idModulo = idModuloDe(req);
+      const resultado = await gestorAprendizaje.obtenerModulo(
+        usuario.idUsuario,
+        idModulo
+      );
+      res.status(200).json(aModuloRespuesta(resultado));
     } catch (error) {
       next(error);
     }
@@ -112,5 +159,11 @@ export function crearControladoresAprendizaje(
     }
   };
 
-  return { miRuta, iniciarModulo, obtenerEvaluacion, responderEvaluacion };
+  return {
+    miRuta,
+    iniciarModulo,
+    obtenerModulo,
+    obtenerEvaluacion,
+    responderEvaluacion,
+  };
 }
