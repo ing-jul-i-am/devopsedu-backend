@@ -1,7 +1,7 @@
 // src/api/rutas/modulos.rutas.ts
 // Rutas del grupo de modulos de aprendizaje. Exclusivas del rol docente (RF-04, DT-03).
 // Orden de middlewares: autenticacion -> autorizacion -> validacion -> controlador.
-// Cubre: RF-20, RF-23 — CU-10, CU-12
+// Cubre: RF-20, RF-23, RF-24 — CU-10, CU-12, CU-14
 
 import { Router, type RequestHandler } from "express";
 import type { GestorModulos } from "../../servicios-aplicacion/gestor-modulos.js";
@@ -11,6 +11,7 @@ import { autorizar } from "../middlewares/autorizar.js";
 import { crearModuloSchema } from "../validadores/modulos/crear-modulo.validador.js";
 import { editarModuloSchema } from "../validadores/modulos/editar-modulo.validador.js";
 import { crearActividadSchema } from "../validadores/actividades/crear-actividad.validador.js";
+import { crearEvaluacionSchema } from "../validadores/evaluaciones/crear-evaluacion.validador.js";
 
 export function crearRutasModulos(
   gestorModulos: GestorModulos,
@@ -37,6 +38,13 @@ export function crearRutasModulos(
     rol,
     validar(crearActividadSchema),
     c.crearActividad
+  );
+  router.post(
+    "/:idModulo/evaluacion",
+    autenticar,
+    rol,
+    validar(crearEvaluacionSchema),
+    c.crearEvaluacion
   );
 
   return router;

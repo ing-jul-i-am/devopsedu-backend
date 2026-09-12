@@ -1,11 +1,13 @@
 // tests/unitarias/servicios-aplicacion/gestor-modulos.test.ts
-// Cubre: RF-20, RF-23 — CU-10, CU-12
+// Cubre: RF-20, RF-23, RF-24 — CU-10, CU-12, CU-14
 
 import { describe, it, expect, vi } from "vitest";
 import { GestorModulos } from "@/servicios-aplicacion/gestor-modulos.js";
 import { ModuloNoEncontradoError } from "@/dominio/errores/modulo-no-encontrado-error.js";
+import { EvaluacionYaExisteError } from "@/dominio/errores/evaluacion-ya-existe-error.js";
 import { datosModuloValidos } from "../../fixtures/modulo.factory.js";
 import { criteriosValidacionDePrueba } from "../../fixtures/actividad.factory.js";
+import { preguntasDePrueba } from "../../fixtures/evaluacion.factory.js";
 
 function crearDependenciasMock() {
   return {
@@ -17,6 +19,10 @@ function crearDependenciasMock() {
     },
     actividadRepo: {
       crear: vi.fn(),
+    },
+    evaluacionRepo: {
+      crear: vi.fn(),
+      buscarPorModulo: vi.fn(),
     },
   };
 }
@@ -145,6 +151,84 @@ describe("GestorModulos", () => {
       // Assert
       await expect(intento).rejects.toBeInstanceOf(ModuloNoEncontradoError);
       expect(dep.actividadRepo.crear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("crearEvaluacion", () => {
+    it("crea la evaluacion cuando el modulo existe y no tiene una previa", async () => {
+      // Arrange
+      const dep = crearDependenciasMock();
+      dep.moduloRepo.buscarPorId.mockResolvedValue({
+        idModulo: 1,
+        ...datosModuloValidos(),
+      });
+      dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
+      const preguntas = preguntasDePrueba(5);
+      const fechaDisponible = new Date("2026-01-01");
+      dep.evaluacionRepo.crear.mockResolvedValue({
+        idEvaluacion: 20,
+        titulo: "Evaluacion del modulo",
+        preguntas,
+        fechaDisponible,
+        idModulo: 1,
+      });
+      const gestor = new GestorModulos(dep as any);
+
+      // Act
+      const evaluacion = await gestor.crearEvaluacion(1, {
+        titulo: "Evaluacion del modulo",
+        preguntas,
+        fechaDisponible,
+      });
+
+      // Assert
+      expect(dep.evaluacionRepo.crear).toHaveBeenCalledWith({
+        titulo: "Evaluacion del modulo",
+        preguntas,
+        fechaDisponible,
+        idModulo: 1,
+      });
+      expect(evaluacion.idEvaluacion).toBe(20);
+    });
+
+    it("lanza ModuloNoEncontradoError cuando el modulo no existe", async () => {
+      // Arrange
+      const dep = crearDependenciasMock();
+      dep.moduloRepo.buscarPorId.mockResolvedValue(null);
+      const gestor = new GestorModulos(dep as any);
+
+      // Act
+      const intento = gestor.crearEvaluacion(999, {
+        titulo: "Evaluacion del modulo",
+        preguntas: preguntasDePrueba(1),
+        fechaDisponible: new Date("2026-01-01"),
+      });
+
+      // Assert
+      await expect(intento).rejects.toBeInstanceOf(ModuloNoEncontradoError);
+      expect(dep.evaluacionRepo.crear).not.toHaveBeenCalled();
+    });
+
+    it("lanza EvaluacionYaExisteError cuando el modulo ya tiene una evaluacion", async () => {
+      // Arrange
+      const dep = crearDependenciasMock();
+      dep.moduloRepo.buscarPorId.mockResolvedValue({
+        idModulo: 1,
+        ...datosModuloValidos(),
+      });
+      dep.evaluacionRepo.buscarPorModulo.mockResolvedValue({ idEvaluacion: 5 });
+      const gestor = new GestorModulos(dep as any);
+
+      // Act
+      const intento = gestor.crearEvaluacion(1, {
+        titulo: "Evaluacion del modulo",
+        preguntas: preguntasDePrueba(1),
+        fechaDisponible: new Date("2026-01-01"),
+      });
+
+      // Assert
+      await expect(intento).rejects.toBeInstanceOf(EvaluacionYaExisteError);
+      expect(dep.evaluacionRepo.crear).not.toHaveBeenCalled();
     });
   });
 });

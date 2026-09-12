@@ -28,13 +28,18 @@ base de datos y resincroniza automaticamente (ver 3.6):
   (docente, ver 4.6) y `POST /api/aprendizaje/modulos/:idModulo/iniciar`
   (estudiante, ver 6.2). `RutaAprendizaje.progreso` ahora lo actualiza
   `EvaluadorActividad` tras cada actividad completada.
+- Etapa 6 (RF-24, CU-14, DT-11): se agrega `POST /api/modulos/:idModulo/evaluacion`
+  (docente, ver 4.7) y `GET`/`POST /api/aprendizaje/modulos/:idModulo/evaluacion`
+  (estudiante, ver 6.3). Con esto la Etapa 6 (componente educativo) queda
+  completa. `RutaAprendizaje.progreso` ahora combina actividades y
+  evaluaciones aprobadas (`CalculadorProgreso`).
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
-Este documento describe **unicamente los endpoints ya implementados**. El resto
-de `/api/aprendizaje` (RF-24) y `/api/reportes` (docente, RF-25, RF-26)
-todavia no existen en el backend y no deben asumirse disponibles por el
-frontend. Cuando se implementen, este documento se actualizara.
+Este documento describe **unicamente los endpoints ya implementados**. El
+`/api/reportes` (docente, RF-25, RF-26) todavia no existe en el backend y no
+debe asumirse disponible por el frontend. Cuando se implemente, este
+documento se actualizara.
 
 - URL base (desarrollo): `http://localhost:3000` — puerto por defecto de
   `PORT` en `.env.example`, configurable via variable de entorno.
@@ -627,6 +632,60 @@ es. Si se omite `condiciones`, el criterio se cumple con solo ejecutar la
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ModuloNoEncontradoError` — no existe un modulo con ese `idModulo` |
 
+### 4.7 `POST /api/modulos/:idModulo/evaluacion`
+
+Crea la evaluacion del modulo (RF-24, ver DT-11). Cardinalidad 0-o-1 con el
+modulo: un segundo intento de creacion falla.
+
+**Request body**
+
+```json
+{
+  "titulo": "string, minimo 3 caracteres",
+  "preguntas": [
+    {
+      "pregunta": "string, minimo 3 caracteres",
+      "opciones": ["string, 2 a 5 opciones"],
+      "respuestaCorrecta": "entero >= 0, indice dentro de opciones"
+    }
+  ],
+  "fechaDisponible": "fecha ISO 8601"
+}
+```
+
+`preguntas` requiere al menos un elemento. Antes de esa fecha, el estudiante
+no puede consultar ni responder la evaluacion (ver 6.3).
+
+**Response `201 Created`**
+
+```json
+{
+  "idEvaluacion": 12,
+  "titulo": "Evaluacion: Redes en Docker",
+  "preguntas": [
+    {
+      "pregunta": "¿Cual es la diferencia entre un volumen y un bind mount?",
+      "opciones": ["...", "...", "...", "..."],
+      "respuestaCorrecta": 1
+    }
+  ],
+  "fechaDisponible": "2026-01-01T00:00:00.000Z",
+  "idModulo": 3
+}
+```
+
+Nota: esta respuesta es para el **docente** e incluye `respuestaCorrecta`. La
+respuesta que ve el **estudiante** (6.3) la oculta.
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido (ver 1.4): falta algun campo, menos de 2 u mas de 5 opciones en una pregunta, o `respuestaCorrecta` fuera de rango |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoEncontradoError` — no existe un modulo con ese `idModulo` |
+| `409` | `EvaluacionYaExisteError` — el modulo ya tiene una evaluacion |
+
 ---
 
 ## 5. Rutas de aprendizaje — `/api/rutas`
@@ -677,17 +736,18 @@ ruta (viola la llave primaria compuesta de `ruta_modulo`).
 
 ## 6. Aprendizaje del estudiante — `/api/aprendizaje`
 
-Cubre RF-22, RF-23 — CU-13, CU-12. Todas las rutas requieren autenticacion y estan
-restringidas al rol `estudiante`; un docente recibe `403`.
+Cubre RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14. Todas las rutas requieren
+autenticacion y estan restringidas al rol `estudiante`; un docente recibe `403`.
 
 ### 6.1 `GET /api/aprendizaje/mi-ruta`
 
 Devuelve la ruta de aprendizaje mas reciente asignada al estudiante autenticado
 (ver 5.1), con sus modulos en el orden de la secuencia y el nombre de cada uno.
-`progreso` es el campo persistido en `RutaAprendizaje`, actualizado por
-`EvaluadorActividad` cada vez que se completa una actividad (RF-23, ver DT-10):
-`(actividades completadas) / (total de actividades de la ruta) * 100`. Las
-evaluaciones de modulo (RF-24, aun no implementado) todavia no se cuentan.
+`progreso` es el campo persistido en `RutaAprendizaje`, recalculado por
+`CalculadorProgreso` cada vez que se completa una actividad (RF-23) o se
+aprueba una evaluacion (RF-24, ver DT-11):
+`(actividades completadas + evaluaciones aprobadas) / (total de actividades +
+total de evaluaciones de la ruta) * 100`.
 
 **Response `200 OK`** (con ruta asignada)
 
@@ -725,6 +785,58 @@ idempotente: llamarlo varias veces no reinicia la fecha ya registrada.
 | --- | --- |
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `ModuloNoAsignadoError` — el `idModulo` no pertenece a la ruta activa del estudiante (o no tiene ninguna ruta asignada) |
+
+### 6.3 `GET` y `POST /api/aprendizaje/modulos/:idModulo/evaluacion`
+
+RF-24 (ver DT-11). Ambos exigen que `idModulo` pertenezca a la ruta activa del
+estudiante y que la evaluacion ya haya alcanzado su `fechaDisponible`.
+
+**`GET`** — devuelve las preguntas **sin** `respuestaCorrecta`:
+
+```json
+{
+  "idEvaluacion": 12,
+  "titulo": "Evaluacion: Redes en Docker",
+  "fechaDisponible": "2026-01-01T00:00:00.000Z",
+  "preguntas": [
+    { "pregunta": "¿Cual es la diferencia entre un volumen y un bind mount?", "opciones": ["...", "...", "...", "..."] }
+  ]
+}
+```
+
+**`POST`** — envia las respuestas y devuelve la retroalimentacion inmediata
+(RF-24), sin revelar cual era la opcion correcta en las preguntas falladas:
+
+```json
+{ "respuestas": [1, 0, 2, 3, 1] }
+```
+
+```json
+{
+  "puntuacion": 80,
+  "aprobado": true,
+  "intentosRestantes": 1,
+  "detalle": [
+    { "correcta": true },
+    { "correcta": false }
+  ]
+}
+```
+
+`puntuacion` es el porcentaje de aciertos; `aprobado` compara contra
+`UMBRAL_APROBACION_EVALUACION` (70, fijo — ver DT-11). Una vez aprobada, la
+evaluacion se bloquea para nuevos intentos. `intentosRestantes` cuenta contra
+`MAXIMO_INTENTOS_EVALUACION` (2, fijo).
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | (solo `POST`) `respuestas` no coincide en cantidad con las preguntas de la evaluacion, o el cuerpo es invalido (ver 1.4) |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoAsignadoError` (el modulo no pertenece a la ruta del estudiante) o `EvaluacionNoEncontradaError` (el modulo no tiene evaluacion) |
+| `409` | (solo `POST`) `EvaluacionYaAprobadaError` (ya se habia aprobado) o `IntentosAgotadosError` (se agoto el maximo de intentos) |
+| `422` | `EvaluacionNoDisponibleError` — todavia no se alcanza `fechaDisponible` |
 
 ---
 
@@ -803,16 +915,22 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `ServicioNoEncontradoError` | 404 | `Servicio no encontrado` | — |
 | `ModuloNoEncontradoError` | 404 | `Modulo no encontrado` | — |
 | `ModuloNoAsignadoError` | 404 | `El modulo no pertenece a tu ruta de aprendizaje` | — |
+| `EvaluacionNoEncontradaError` | 404 | `Evaluacion no encontrada` | — |
 | `ContenedorNoEncontradoError` | 404 | `El contenedor del servicio no existe` | — |
 | `UsuarioNoEncontradoError` | 404 | `Usuario no encontrado` | — |
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
 | `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
+| `EvaluacionYaExisteError` | 409 | `El modulo ya tiene una evaluacion asociada` | — |
+| `EvaluacionYaAprobadaError` | 409 | `Ya aprobaste esta evaluacion` | — |
+| `IntentosAgotadosError` | 409 | `Se agotaron los intentos permitidos para esta evaluacion` | — |
 | `TipoArchivoNoPermitidoError` | 400 | `Tipo de archivo no permitido` | — |
 | `ArchivoDemasiadoGrandeError` | 400 | `El archivo excede el tamano maximo permitido` | — |
 | `ArchivoNoProporcionadoError` | 400 | `No se proporciono ningun archivo` | — |
+| `RespuestasIncompletasError` | 400 | `La cantidad de respuestas no coincide con la cantidad de preguntas` | — |
 | `RecursosInsuficientesError` | 422 | `Recursos insuficientes para la configuracion solicitada` | `solicitado`, `disponible` (ver 9.2) |
 | `ImagenDockerNoDisponibleError` | 422 | `La imagen Docker '<imagen>' no esta disponible` | — |
+| `EvaluacionNoDisponibleError` | 422 | `La evaluacion todavia no esta disponible` | — |
 | `MotorDockerNoDisponibleError` | 503 | `El motor Docker no esta disponible` | — |
 | `RolNoDisponibleError` | 500 | Se responde con el mensaje generico `Error interno del servidor` (el mensaje real no se expone) | — |
 | Cualquier otro error no controlado | 500 | `Error interno del servidor` | — |
@@ -838,15 +956,13 @@ No implementado aun en el backend (no invocar desde el frontend todavia):
   el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
 - Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
   DT-08 para la relacion con el reseteo administrativo actual).
-- Resto de `/api/aprendizaje/*` (estudiante, RF-24, CU-14 — evaluaciones de
-  modulo): `GET /api/aprendizaje/mi-ruta` (RF-22) y `POST
-  /api/aprendizaje/modulos/:idModulo/iniciar` (RF-23) ya estan implementados,
-  ver seccion 6.
-- `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16)
+- `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16). Con RF-24 (ver
+  seccion 6.3) la Etapa 6 queda completa; `/api/reportes` es lo unico
+  pendiente de la Etapa 7.
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por
   `MonitorPeriodico` (RF-16, RF-18, RF-19); no hay endpoint de "metrica actual" fuera
   de ese historico.
 
-Cuando el backend avance a las etapas 6-7 (ver CLAUDE.md seccion 11), este documento
+Cuando el backend avance a la Etapa 7 (ver CLAUDE.md seccion 11), este documento
 debe actualizarse antes de que el frontend dependa de esos endpoints.

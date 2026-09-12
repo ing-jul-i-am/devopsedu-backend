@@ -1,10 +1,14 @@
 // src/api/controladores/aprendizaje/aprendizaje.controlador.ts
 // Controlador HTTP para las acciones del estudiante sobre su propia ruta de aprendizaje.
-// Cubre: RF-22, RF-23 — CU-13, CU-12
+// La respuesta de la evaluacion (RF-24) oculta respuestaCorrecta de cada pregunta: el
+// estudiante no debe poder ver la respuesta correcta antes de responder ni entre reintentos.
+// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
 
 import type { RequestHandler, Request } from "express";
+import type { Evaluacion } from "@prisma/client";
 import type { GestorAprendizaje } from "../../../servicios-aplicacion/gestor-aprendizaje.js";
 import type { RutaAprendizajeConModulosDetalle } from "../../../repositorios/ruta-aprendizaje-repo.js";
+import type { PreguntaEvaluacion } from "../../../dominio/modelos/pregunta-evaluacion.js";
 import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ModuloNoAsignadoError } from "../../../dominio/errores/modulo-no-asignado-error.js";
@@ -37,9 +41,27 @@ function aRutaRespuesta(ruta: RutaAprendizajeConModulosDetalle) {
   };
 }
 
+function aEvaluacionRespuesta(evaluacion: Evaluacion) {
+  const preguntas = evaluacion.preguntas as unknown as PreguntaEvaluacion[];
+  return {
+    idEvaluacion: evaluacion.idEvaluacion,
+    titulo: evaluacion.titulo,
+    fechaDisponible: evaluacion.fechaDisponible,
+    preguntas: preguntas.map((pregunta) => ({
+      pregunta: pregunta.pregunta,
+      opciones: pregunta.opciones,
+    })),
+  };
+}
+
 export function crearControladoresAprendizaje(
   gestorAprendizaje: GestorAprendizaje
-): { miRuta: RequestHandler; iniciarModulo: RequestHandler } {
+): {
+  miRuta: RequestHandler;
+  iniciarModulo: RequestHandler;
+  obtenerEvaluacion: RequestHandler;
+  responderEvaluacion: RequestHandler;
+} {
   const miRuta: RequestHandler = async (req, res, next) => {
     try {
       const usuario = usuarioDe(req);
@@ -61,5 +83,34 @@ export function crearControladoresAprendizaje(
     }
   };
 
-  return { miRuta, iniciarModulo };
+  const obtenerEvaluacion: RequestHandler = async (req, res, next) => {
+    try {
+      const usuario = usuarioDe(req);
+      const idModulo = idModuloDe(req);
+      const evaluacion = await gestorAprendizaje.obtenerEvaluacion(
+        usuario.idUsuario,
+        idModulo
+      );
+      res.status(200).json(aEvaluacionRespuesta(evaluacion));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  const responderEvaluacion: RequestHandler = async (req, res, next) => {
+    try {
+      const usuario = usuarioDe(req);
+      const idModulo = idModuloDe(req);
+      const retroalimentacion = await gestorAprendizaje.responderEvaluacion(
+        usuario.idUsuario,
+        idModulo,
+        req.body.respuestas
+      );
+      res.status(200).json(retroalimentacion);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  return { miRuta, iniciarModulo, obtenerEvaluacion, responderEvaluacion };
 }

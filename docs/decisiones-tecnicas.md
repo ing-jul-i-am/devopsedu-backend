@@ -394,3 +394,64 @@ para ella (alcance "cualquier servicio propio" acordado con el desarrollador).
 - Contar `intentos` siempre como 1 (sin consultar el historico). Descartada porque el
   desarrollador prefirio una metrica mas fiel al numero real de intentos sobre el servicio
   usado, aun a costa de poder sobreestimar si ese servicio se reutilizo para otros fines.
+
+## DT-11: evaluaciones de modulo (RF-24)
+
+**Fecha:** 2026-09-12
+
+**Contexto:** RF-24 (aplicacion de evaluaciones, CU-14) tampoco tiene tabla de especificacion
+en el documento de diseno (la propia fuente lo deja explicito: "las especificaciones detalladas
+de los casos de uso restantes pueden construirse siguiendo la misma estructura"). El unico
+material es el mockup "VISTA 12 — EVALUACION DE MODULO", degradado por el OCR, que sugiere una
+evaluacion de 5 preguntas de opcion multiple, un umbral visible como "70/100" y un limite de
+"INTENTO 1 DE 2". Estas decisiones se acordaron con el desarrollador antes de iniciar TDD.
+
+**Decision:**
+1. **Preguntas de opcion multiple, una respuesta correcta.** `Evaluacion.preguntas` (Json):
+   arreglo de `{ pregunta: string, opciones: string[], respuestaCorrecta: number }`. El tipo de
+   dominio vive en `src/dominio/modelos/pregunta-evaluacion.ts` y el esquema Zod en
+   `src/api/validadores/evaluaciones/crear-evaluacion.validador.ts`.
+2. **Umbral (70) y maximo de intentos (2) son constantes fijas del sistema**, no configurables
+   por evaluacion: `src/dominio/reglas-evaluacion.ts`
+   (`UMBRAL_APROBACION_EVALUACION`, `MAXIMO_INTENTOS_EVALUACION`). No requirio migracion de
+   Prisma.
+3. **Una evaluacion aprobada se bloquea para nuevos intentos.**
+   `ResultadoRepo.existeAprobadaPorUsuarioYEvaluacion` lo verifica antes de calificar un nuevo
+   intento; si ya hay un resultado con `puntuacion >= UMBRAL_APROBACION_EVALUACION`, se lanza
+   `EvaluacionYaAprobadaError` (409).
+4. **El progreso de la ruta combina actividades y evaluaciones** en un solo porcentaje:
+   `(actividades completadas + evaluaciones aprobadas) / (total actividades + total evaluaciones
+   de la ruta) * 100`. Esto obligo a extraer el calculo de progreso —hasta ahora dentro de
+   `EvaluadorActividad` (RF-23, DT-10)— a un servicio compartido nuevo, `CalculadorProgreso`
+   (`src/servicios-aplicacion/calculador-progreso.ts`), usado tanto por `EvaluadorActividad`
+   como por `GestorAprendizaje.responderEvaluacion`.
+5. **Flujo de endpoints**, siguiendo el mismo patron que RF-23: el docente crea la evaluacion
+   del modulo con `POST /api/modulos/:idModulo/evaluacion` (falla con `EvaluacionYaExisteError`,
+   409, si el modulo ya tiene una, reflejando la cardinalidad 0-o-1 del diseno); el estudiante la
+   consulta con `GET /api/aprendizaje/modulos/:idModulo/evaluacion` (la respuesta oculta
+   `respuestaCorrecta` de cada pregunta) y la responde con
+   `POST /api/aprendizaje/modulos/:idModulo/evaluacion`.
+6. **`tiempoEmpleado` reutiliza `RutaModulo.fechaInicio`** (el mismo campo agregado en DT-10 para
+   RF-23): segundos entre esa fecha y el momento en que se responde la evaluacion, `0` si no hay
+   fecha registrada. No se agrego un campo de inicio propio de la evaluacion.
+7. **Retroalimentacion sin filtrar respuestas.** La respuesta de
+   `POST .../evaluacion` incluye `puntuacion`, `aprobado`, `intentosRestantes` y un `detalle` por
+   pregunta (`{ correcta: boolean }`), pero nunca el indice de la opcion correcta — para no
+   filtrarla de cara a un segundo intento.
+
+**Consecuencias:** Si en el futuro se necesita un umbral o un limite de intentos distinto por
+evaluacion, `reglas-evaluacion.ts` deja de ser suficiente y hara falta una migracion (agregar
+campos a `Evaluacion`) mas los cambios de validacion correspondientes. El calculo de progreso ya
+no vive en un unico lugar visible desde `EvaluadorActividad`; cualquier cambio a la formula debe
+hacerse en `CalculadorProgreso` para que ambos flujos (RF-23 y RF-24) se mantengan consistentes.
+
+**Alternativas consideradas:**
+- Umbral y maximo de intentos configurables por evaluacion (campos nuevos en `Evaluacion`).
+  Descartada por RNF-20: el documento de diseno no pide esa flexibilidad y el prototipo no la
+  necesita todavia.
+- Permitir reintentar despues de aprobar para subir la nota (progreso con la mejor puntuacion).
+  Descartada por simplicidad: evita ambiguedad sobre cual resultado es "el" resultado de la
+  evaluacion para efectos de progreso y reportes futuros (RF-25/26).
+- Mantener el progreso de RF-23 sin tocar y reportar las evaluaciones aprobadas por separado.
+  Descartada porque el desarrollador prefirio una sola metrica de progreso visible en
+  `GET /api/aprendizaje/mi-ruta`, coherente con RF-22.

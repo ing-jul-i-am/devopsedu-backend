@@ -13,6 +13,7 @@ import { MetricaRepo } from "./repositorios/metrica-repo.js";
 import { ModuloRepo } from "./repositorios/modulo-repo.js";
 import { RutaAprendizajeRepo } from "./repositorios/ruta-aprendizaje-repo.js";
 import { ActividadRepo } from "./repositorios/actividad-repo.js";
+import { EvaluacionRepo } from "./repositorios/evaluacion-repo.js";
 import { ResultadoRepo } from "./repositorios/resultado-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
@@ -25,6 +26,7 @@ import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
 import { EvaluadorActividad } from "./servicios-aplicacion/evaluador-actividad.js";
+import { CalculadorProgreso } from "./servicios-aplicacion/calculador-progreso.js";
 import { GestorModulos } from "./servicios-aplicacion/gestor-modulos.js";
 import { GestorRutas } from "./servicios-aplicacion/gestor-rutas.js";
 import { GestorAprendizaje } from "./servicios-aplicacion/gestor-aprendizaje.js";
@@ -69,6 +71,7 @@ export function construirDependencias(
   const moduloRepo = new ModuloRepo(prisma);
   const rutaAprendizajeRepo = new RutaAprendizajeRepo(prisma);
   const actividadRepo = new ActividadRepo(prisma);
+  const evaluacionRepo = new EvaluacionRepo(prisma);
   const resultadoRepo = new ResultadoRepo(prisma);
 
   const cifrador = new Cifrador();
@@ -94,12 +97,19 @@ export function construirDependencias(
     metricaRepo,
     verificador,
   });
+  const calculadorProgreso = new CalculadorProgreso({
+    rutaRepo: rutaAprendizajeRepo,
+    actividadRepo,
+    evaluacionRepo,
+    resultadoRepo,
+  });
   const evaluador = new EvaluadorActividad({
     rutaRepo: rutaAprendizajeRepo,
     actividadRepo,
     resultadoRepo,
     servicioRepo,
     registroRepo,
+    calculadorProgreso,
   });
   const gestorDocker = new GestorDocker({
     servicioRepo,
@@ -107,7 +117,11 @@ export function construirDependencias(
     verificador,
     evaluador,
   });
-  const gestorModulos = new GestorModulos({ moduloRepo, actividadRepo });
+  const gestorModulos = new GestorModulos({
+    moduloRepo,
+    actividadRepo,
+    evaluacionRepo,
+  });
   const gestorRutas = new GestorRutas({
     rutaRepo: rutaAprendizajeRepo,
     usuarioRepo,
@@ -115,6 +129,9 @@ export function construirDependencias(
   });
   const gestorAprendizaje = new GestorAprendizaje({
     rutaRepo: rutaAprendizajeRepo,
+    evaluacionRepo,
+    resultadoRepo,
+    calculadorProgreso,
   });
   const gestorUsuarios = new GestorUsuarios({ usuarioRepo, cifrador });
 

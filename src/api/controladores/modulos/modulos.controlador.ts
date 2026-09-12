@@ -1,10 +1,11 @@
 // src/api/controladores/modulos/modulos.controlador.ts
 // Controladores HTTP de modulos de aprendizaje: creacion, listado y edicion por el docente.
-// Tambien expone la creacion de actividades practicas dentro de un modulo (RF-23).
-// Cubre: RF-20, RF-23 — CU-10, CU-12
+// Tambien expone la creacion de actividades practicas (RF-23) y de la evaluacion (RF-24) de un
+// modulo.
+// Cubre: RF-20, RF-23, RF-24 — CU-10, CU-12, CU-14
 
 import type { RequestHandler, Request } from "express";
-import type { Modulo, Actividad } from "@prisma/client";
+import type { Modulo, Actividad, Evaluacion } from "@prisma/client";
 import type { GestorModulos } from "../../../servicios-aplicacion/gestor-modulos.js";
 import { ModuloNoEncontradoError } from "../../../dominio/errores/modulo-no-encontrado-error.js";
 
@@ -35,12 +36,23 @@ function aActividadRespuesta(actividad: Actividad) {
   };
 }
 
+function aEvaluacionRespuesta(evaluacion: Evaluacion) {
+  return {
+    idEvaluacion: evaluacion.idEvaluacion,
+    titulo: evaluacion.titulo,
+    preguntas: evaluacion.preguntas,
+    fechaDisponible: evaluacion.fechaDisponible,
+    idModulo: evaluacion.idModulo,
+  };
+}
+
 export function crearControladoresModulos(gestorModulos: GestorModulos): {
   crear: RequestHandler;
   listar: RequestHandler;
   editar: RequestHandler;
   subirImagen: RequestHandler;
   crearActividad: RequestHandler;
+  crearEvaluacion: RequestHandler;
 } {
   const crear: RequestHandler = async (req, res, next) => {
     try {
@@ -86,5 +98,15 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
     }
   };
 
-  return { crear, listar, editar, subirImagen, crearActividad };
+  const crearEvaluacion: RequestHandler = async (req, res, next) => {
+    try {
+      const idModulo = idModuloDe(req);
+      const evaluacion = await gestorModulos.crearEvaluacion(idModulo, req.body);
+      res.status(201).json(aEvaluacionRespuesta(evaluacion));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  return { crear, listar, editar, subirImagen, crearActividad, crearEvaluacion };
 }

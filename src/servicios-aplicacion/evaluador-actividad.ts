@@ -1,7 +1,9 @@
 // src/servicios-aplicacion/evaluador-actividad.ts
 // Servicio de aplicacion que evalua automaticamente el cumplimiento de las actividades
 // practicas de un modulo, tras cada operacion exitosa que el estudiante ejecuta sobre uno de
-// sus servicios. Cubre: RF-23 — CU-12 (ver docs/decisiones-tecnicas.md DT-10)
+// sus servicios. El recalculo de progreso se delega en CalculadorProgreso (compartido con las
+// evaluaciones de RF-24, ver DT-11) para no duplicar esa formula.
+// Cubre: RF-23 — CU-12 (ver docs/decisiones-tecnicas.md DT-10)
 
 import type { Actividad, RutaModulo } from "@prisma/client";
 import type {
@@ -15,25 +17,22 @@ import type {
   ServicioConConfiguraciones,
 } from "../repositorios/servicio-repo.js";
 import type { RegistroDespliegueRepo } from "../repositorios/registro-despliegue-repo.js";
+import type { CalculadorProgreso } from "./calculador-progreso.js";
 import type {
   CriteriosValidacion,
   CondicionesValidacion,
 } from "../dominio/modelos/criterios-validacion.js";
 
 export interface DependenciasEvaluadorActividad {
-  rutaRepo: Pick<
-    RutaAprendizajeRepo,
-    "buscarUltimaPorUsuario" | "actualizarProgreso"
-  >;
+  rutaRepo: Pick<RutaAprendizajeRepo, "buscarUltimaPorUsuario">;
   actividadRepo: Pick<ActividadRepo, "listarPorModulo">;
   resultadoRepo: Pick<
     ResultadoRepo,
-    | "existePorUsuarioYActividad"
-    | "crearParaActividad"
-    | "contarActividadesCompletadasEnRuta"
+    "existePorUsuarioYActividad" | "crearParaActividad"
   >;
   servicioRepo: Pick<ServicioRepo, "buscarPorIdConConfiguracionVigente">;
   registroRepo: Pick<RegistroDespliegueRepo, "contarPorServicioYOperacion">;
+  calculadorProgreso: Pick<CalculadorProgreso, "recalcular">;
 }
 
 type ConfiguracionVigente = ServicioConConfiguraciones["configuraciones"][number];
@@ -97,7 +96,7 @@ export class EvaluadorActividad {
       intentos,
     });
 
-    await this.actualizarProgreso(idUsuario, ruta, actividadesPorModulo);
+    await this.dep.calculadorProgreso.recalcular(idUsuario, ruta);
   }
 
   private async cargarActividadesPorModulo(
@@ -178,25 +177,5 @@ export class EvaluadorActividad {
 
   private longitudDe(valor: unknown): number {
     return Array.isArray(valor) ? valor.length : 0;
-  }
-
-  private async actualizarProgreso(
-    idUsuario: number,
-    ruta: RutaAprendizajeConModulos,
-    actividadesPorModulo: Actividad[][]
-  ): Promise<void> {
-    const idsActividad = actividadesPorModulo
-      .flat()
-      .map((actividad) => actividad.idActividad);
-    const completadas =
-      await this.dep.resultadoRepo.contarActividadesCompletadasEnRuta(
-        idUsuario,
-        idsActividad
-      );
-    const progreso =
-      idsActividad.length === 0
-        ? 0
-        : Math.round((completadas / idsActividad.length) * 10000) / 100;
-    await this.dep.rutaRepo.actualizarProgreso(ruta.idRuta, progreso);
   }
 }

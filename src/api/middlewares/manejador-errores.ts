@@ -21,6 +21,12 @@ import { MotorDockerNoDisponibleError } from "../../dominio/errores/motor-docker
 import { TipoArchivoNoPermitidoError } from "../../dominio/errores/tipo-archivo-no-permitido-error.js";
 import { ArchivoDemasiadoGrandeError } from "../../dominio/errores/archivo-demasiado-grande-error.js";
 import { ArchivoNoProporcionadoError } from "../../dominio/errores/archivo-no-proporcionado-error.js";
+import { EvaluacionNoEncontradaError } from "../../dominio/errores/evaluacion-no-encontrada-error.js";
+import { EvaluacionYaExisteError } from "../../dominio/errores/evaluacion-ya-existe-error.js";
+import { EvaluacionNoDisponibleError } from "../../dominio/errores/evaluacion-no-disponible-error.js";
+import { RespuestasIncompletasError } from "../../dominio/errores/respuestas-incompletas-error.js";
+import { IntentosAgotadosError } from "../../dominio/errores/intentos-agotados-error.js";
+import { EvaluacionYaAprobadaError } from "../../dominio/errores/evaluacion-ya-aprobada-error.js";
 import { logger } from "../../infraestructura/logger.js";
 
 export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
@@ -46,13 +52,19 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof ServicioNoEncontradoError ||
     err instanceof ModuloNoEncontradoError ||
     err instanceof ModuloNoAsignadoError ||
-    err instanceof UsuarioNoEncontradoError
+    err instanceof UsuarioNoEncontradoError ||
+    err instanceof EvaluacionNoEncontradaError
   ) {
     res.status(404).json({ error: err.message });
     return;
   }
 
-  if (err instanceof CorreoYaRegistradoError) {
+  if (
+    err instanceof CorreoYaRegistradoError ||
+    err instanceof EvaluacionYaExisteError ||
+    err instanceof IntentosAgotadosError ||
+    err instanceof EvaluacionYaAprobadaError
+  ) {
     res.status(409).json({ error: err.message });
     return;
   }
@@ -67,7 +79,10 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
-  if (err instanceof ImagenDockerNoDisponibleError) {
+  if (
+    err instanceof ImagenDockerNoDisponibleError ||
+    err instanceof EvaluacionNoDisponibleError
+  ) {
     res.status(422).json({ error: err.message });
     return;
   }
@@ -77,6 +92,11 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof NombreContenedorEnUsoError
   ) {
     res.status(409).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof RespuestasIncompletasError) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

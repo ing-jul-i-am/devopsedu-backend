@@ -8,16 +8,15 @@ function crearDependenciasMock() {
   return {
     rutaRepo: {
       buscarUltimaPorUsuario: vi.fn(),
-      actualizarProgreso: vi.fn(),
     },
     actividadRepo: { listarPorModulo: vi.fn() },
     resultadoRepo: {
       existePorUsuarioYActividad: vi.fn(),
       crearParaActividad: vi.fn(),
-      contarActividadesCompletadasEnRuta: vi.fn(),
     },
     servicioRepo: { buscarPorIdConConfiguracionVigente: vi.fn() },
     registroRepo: { contarPorServicioYOperacion: vi.fn() },
+    calculadorProgreso: { recalcular: vi.fn() },
   };
 }
 
@@ -149,7 +148,6 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
       servicioConConfiguracion({ volumenes: [{ origen: "a", destino: "b", modo: "rw" }] })
     );
     dep.registroRepo.contarPorServicioYOperacion.mockResolvedValue(2);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
     const evaluador = new EvaluadorActividad(dep as any);
 
     // Act
@@ -166,7 +164,10 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
     );
     const llamada = dep.resultadoRepo.crearParaActividad.mock.calls[0]?.[0];
     expect(llamada.tiempoEmpleado).toBeGreaterThanOrEqual(120);
-    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 100);
+    expect(dep.calculadorProgreso.recalcular).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ idRuta: 10 })
+    );
   });
 
   it("usa tiempoEmpleado 0 cuando el modulo no tiene fecha de inicio registrada", async () => {
@@ -179,7 +180,6 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
       servicioConConfiguracion()
     );
     dep.registroRepo.contarPorServicioYOperacion.mockResolvedValue(1);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
     const evaluador = new EvaluadorActividad(dep as any);
 
     // Act
