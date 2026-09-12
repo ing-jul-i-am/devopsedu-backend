@@ -22,4 +22,15 @@ export interface BloqueEnlace {
   descripcion?: string | undefined;
 }
 
-export type BloqueContenido = BloqueTexto | BloqueImagen | BloqueEnlace;
+// RF-23: marca donde aparece una actividad practica dentro de la lectura lineal del modulo.
+// idActividad referencia una Actividad ya creada para ese mismo modulo (ver DT-10).
+export interface BloqueActividad {
+  tipo: "actividad";
+  idActividad: number;
+}
+
+export type BloqueContenido =
+  | BloqueTexto
+  | BloqueImagen
+  | BloqueEnlace
+  | BloqueActividad;

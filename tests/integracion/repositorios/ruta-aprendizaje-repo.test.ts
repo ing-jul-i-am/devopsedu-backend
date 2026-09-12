@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/ruta-aprendizaje-repo.test.ts
 // Pruebas de integracion del repositorio de rutas de aprendizaje contra la base de pruebas.
-// Cubre: RF-21, RF-22
+// Cubre: RF-21, RF-22, RF-23
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { RutaAprendizajeRepo } from "@/repositorios/ruta-aprendizaje-repo.js";
@@ -93,6 +93,63 @@ describe("RutaAprendizajeRepo", () => {
 
       // Assert
       expect(encontrada).toBeNull();
+    });
+  });
+
+  describe("marcarInicioModulo", () => {
+    it("marca la fecha de inicio del modulo cuando aun no tenia una", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const modulo = await crearModulo(1);
+      const ruta = await repo.asignar(usuario.idUsuario, [modulo.idModulo]);
+
+      // Act
+      await repo.marcarInicioModulo(ruta.idRuta, modulo.idModulo);
+
+      // Assert
+      const encontrada = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+      const rutaModulo = encontrada?.rutaModulos.find(
+        (rm) => rm.idModulo === modulo.idModulo
+      );
+      expect(rutaModulo?.fechaInicio).not.toBeNull();
+    });
+
+    it("no sobrescribe la fecha de inicio si ya existia", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const modulo = await crearModulo(1);
+      const ruta = await repo.asignar(usuario.idUsuario, [modulo.idModulo]);
+      await repo.marcarInicioModulo(ruta.idRuta, modulo.idModulo);
+      const primera = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+      const fechaOriginal = primera?.rutaModulos.find(
+        (rm) => rm.idModulo === modulo.idModulo
+      )?.fechaInicio;
+
+      // Act
+      await repo.marcarInicioModulo(ruta.idRuta, modulo.idModulo);
+
+      // Assert
+      const segunda = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+      const fechaTrasSegundaLlamada = segunda?.rutaModulos.find(
+        (rm) => rm.idModulo === modulo.idModulo
+      )?.fechaInicio;
+      expect(fechaTrasSegundaLlamada).toEqual(fechaOriginal);
+    });
+  });
+
+  describe("actualizarProgreso", () => {
+    it("actualiza el progreso de la ruta", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const modulo = await crearModulo(1);
+      const ruta = await repo.asignar(usuario.idUsuario, [modulo.idModulo]);
+
+      // Act
+      await repo.actualizarProgreso(ruta.idRuta, 50);
+
+      // Assert
+      const encontrada = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
+      expect(Number(encontrada?.progreso)).toBe(50);
     });
   });
 });

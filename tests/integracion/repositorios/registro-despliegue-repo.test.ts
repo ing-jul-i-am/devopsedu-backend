@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/registro-despliegue-repo.test.ts
 // Pruebas de integracion del repositorio de registros de despliegue (bitacora de operaciones).
-// Cubre: RF-15, RF-17
+// Cubre: RF-15, RF-17, RF-23
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { RegistroDespliegueRepo } from "@/repositorios/registro-despliegue-repo.js";
@@ -93,6 +93,62 @@ describe("RegistroDespliegueRepo", () => {
 
       // Assert
       expect(registros).toHaveLength(0);
+    });
+  });
+
+  describe("contarPorServicioYOperacion", () => {
+    it("cuenta exitos y fallos de esa operacion sobre ese servicio", async () => {
+      // Arrange
+      const servicio = await crearServicioEnBd();
+      await repo.registrar({
+        idServicio: servicio.idServicio,
+        idUsuario: servicio.idUsuario,
+        operacion: "desplegar",
+        resultado: "fallo",
+        mensajeError: "La imagen no esta disponible",
+      });
+      await repo.registrar({
+        idServicio: servicio.idServicio,
+        idUsuario: servicio.idUsuario,
+        operacion: "desplegar",
+        resultado: "exito",
+      });
+      await repo.registrar({
+        idServicio: servicio.idServicio,
+        idUsuario: servicio.idUsuario,
+        operacion: "detener",
+        resultado: "exito",
+      });
+
+      // Act
+      const cantidad = await repo.contarPorServicioYOperacion(
+        servicio.idServicio,
+        "desplegar"
+      );
+
+      // Assert
+      expect(cantidad).toBe(2);
+    });
+
+    it("no cuenta registros de otros servicios", async () => {
+      // Arrange
+      const servicioA = await crearServicioEnBd();
+      const servicioB = await crearServicioEnBd();
+      await repo.registrar({
+        idServicio: servicioB.idServicio,
+        idUsuario: servicioB.idUsuario,
+        operacion: "desplegar",
+        resultado: "exito",
+      });
+
+      // Act
+      const cantidad = await repo.contarPorServicioYOperacion(
+        servicioA.idServicio,
+        "desplegar"
+      );
+
+      // Assert
+      expect(cantidad).toBe(0);
     });
   });
 });

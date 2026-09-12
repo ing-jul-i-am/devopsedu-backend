@@ -55,4 +55,21 @@ export class RutaAprendizajeRepo {
       },
     });
   }
+
+  // RF-23: marca el inicio del modulo solo si aun no tenia fecha, para que el calculo de
+  // tiempoEmpleado de sus actividades sea idempotente ante llamadas repetidas del estudiante.
+  async marcarInicioModulo(idRuta: number, idModulo: number): Promise<void> {
+    await this.prisma.rutaModulo.updateMany({
+      where: { idRuta, idModulo, fechaInicio: null },
+      data: { fechaInicio: new Date() },
+    });
+  }
+
+  // RF-23: recalculado por EvaluadorActividad cada vez que se completa una actividad.
+  async actualizarProgreso(idRuta: number, progreso: number): Promise<void> {
+    await this.prisma.rutaAprendizaje.update({
+      where: { idRuta },
+      data: { progreso },
+    });
+  }
 }

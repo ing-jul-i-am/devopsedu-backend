@@ -1,7 +1,7 @@
 // src/api/rutas/aprendizaje.rutas.ts
 // Rutas del grupo de aprendizaje del estudiante. Exclusivas del rol estudiante.
 // Orden de middlewares: autenticacion -> autorizacion -> controlador.
-// Cubre: RF-22 — CU-13
+// Cubre: RF-22, RF-23 — CU-13, CU-12
 
 import { Router, type RequestHandler } from "express";
 import type { GestorAprendizaje } from "../../servicios-aplicacion/gestor-aprendizaje.js";
@@ -17,6 +17,7 @@ export function crearRutasAprendizaje(
   const rol = autorizar("estudiante");
 
   router.get("/mi-ruta", autenticar, rol, c.miRuta);
+  router.post("/modulos/:idModulo/iniciar", autenticar, rol, c.iniciarModulo);
 
   return router;
 }

@@ -1,9 +1,10 @@
 // src/api/controladores/modulos/modulos.controlador.ts
 // Controladores HTTP de modulos de aprendizaje: creacion, listado y edicion por el docente.
-// Cubre: RF-20 — CU-10
+// Tambien expone la creacion de actividades practicas dentro de un modulo (RF-23).
+// Cubre: RF-20, RF-23 — CU-10, CU-12
 
 import type { RequestHandler, Request } from "express";
-import type { Modulo } from "@prisma/client";
+import type { Modulo, Actividad } from "@prisma/client";
 import type { GestorModulos } from "../../../servicios-aplicacion/gestor-modulos.js";
 import { ModuloNoEncontradoError } from "../../../dominio/errores/modulo-no-encontrado-error.js";
 
@@ -24,11 +25,22 @@ function idModuloDe(req: Request): number {
   return id;
 }
 
+function aActividadRespuesta(actividad: Actividad) {
+  return {
+    idActividad: actividad.idActividad,
+    descripcion: actividad.descripcion,
+    criteriosValidacion: actividad.criteriosValidacion,
+    orden: actividad.orden,
+    idModulo: actividad.idModulo,
+  };
+}
+
 export function crearControladoresModulos(gestorModulos: GestorModulos): {
   crear: RequestHandler;
   listar: RequestHandler;
   editar: RequestHandler;
   subirImagen: RequestHandler;
+  crearActividad: RequestHandler;
 } {
   const crear: RequestHandler = async (req, res, next) => {
     try {
@@ -64,5 +76,15 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
     res.status(201).json({ url: `/archivos/modulos/${archivo.filename}` });
   };
 
-  return { crear, listar, editar, subirImagen };
+  const crearActividad: RequestHandler = async (req, res, next) => {
+    try {
+      const idModulo = idModuloDe(req);
+      const actividad = await gestorModulos.crearActividad(idModulo, req.body);
+      res.status(201).json(aActividadRespuesta(actividad));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  return { crear, listar, editar, subirImagen, crearActividad };
 }

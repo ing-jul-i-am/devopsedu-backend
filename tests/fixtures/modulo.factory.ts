@@ -4,6 +4,7 @@
 
 import type { Modulo, Prisma } from "@prisma/client";
 import type {
+  BloqueActividad,
   BloqueContenido,
   BloqueEnlace,
   BloqueImagen,
@@ -39,6 +40,16 @@ export function bloqueEnlace(
     tipo: "enlace",
     url: "https://docs.docker.com/",
     titulo: "Documentacion oficial de Docker",
+    ...parciales,
+  };
+}
+
+export function bloqueActividad(
+  parciales: Partial<Omit<BloqueActividad, "tipo">> = {}
+): BloqueActividad {
+  return {
+    tipo: "actividad",
+    idActividad: 1,
     ...parciales,
   };
 }

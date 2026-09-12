@@ -12,6 +12,8 @@ import { RegistroDespliegueRepo } from "./repositorios/registro-despliegue-repo.
 import { MetricaRepo } from "./repositorios/metrica-repo.js";
 import { ModuloRepo } from "./repositorios/modulo-repo.js";
 import { RutaAprendizajeRepo } from "./repositorios/ruta-aprendizaje-repo.js";
+import { ActividadRepo } from "./repositorios/actividad-repo.js";
+import { ResultadoRepo } from "./repositorios/resultado-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import {
@@ -22,6 +24,7 @@ import { Autenticador } from "./servicios-aplicacion/autenticador.js";
 import { VerificadorRecursos } from "./servicios-aplicacion/verificador-recursos.js";
 import { GestorServicios } from "./servicios-aplicacion/gestor-servicios.js";
 import { GestorDocker } from "./servicios-aplicacion/gestor-docker.js";
+import { EvaluadorActividad } from "./servicios-aplicacion/evaluador-actividad.js";
 import { GestorModulos } from "./servicios-aplicacion/gestor-modulos.js";
 import { GestorRutas } from "./servicios-aplicacion/gestor-rutas.js";
 import { GestorAprendizaje } from "./servicios-aplicacion/gestor-aprendizaje.js";
@@ -65,6 +68,8 @@ export function construirDependencias(
   const metricaRepo = new MetricaRepo(prisma);
   const moduloRepo = new ModuloRepo(prisma);
   const rutaAprendizajeRepo = new RutaAprendizajeRepo(prisma);
+  const actividadRepo = new ActividadRepo(prisma);
+  const resultadoRepo = new ResultadoRepo(prisma);
 
   const cifrador = new Cifrador();
   const emisor = new EmisorToken({
@@ -89,12 +94,20 @@ export function construirDependencias(
     metricaRepo,
     verificador,
   });
+  const evaluador = new EvaluadorActividad({
+    rutaRepo: rutaAprendizajeRepo,
+    actividadRepo,
+    resultadoRepo,
+    servicioRepo,
+    registroRepo,
+  });
   const gestorDocker = new GestorDocker({
     servicioRepo,
     registroRepo,
     verificador,
+    evaluador,
   });
-  const gestorModulos = new GestorModulos(moduloRepo);
+  const gestorModulos = new GestorModulos({ moduloRepo, actividadRepo });
   const gestorRutas = new GestorRutas({
     rutaRepo: rutaAprendizajeRepo,
     usuarioRepo,

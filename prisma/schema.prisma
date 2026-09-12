@@ -162,9 +162,12 @@ model Modulo {
 }
 
 model RutaModulo {
-  idRuta         Int @map("id_ruta")
-  idModulo       Int @map("id_modulo")
-  ordenSecuencia Int @map("orden_secuencia")
+  idRuta         Int       @map("id_ruta")
+  idModulo       Int       @map("id_modulo")
+  ordenSecuencia Int       @map("orden_secuencia")
+  // RF-23: marca cuando el estudiante llega al modulo, para calcular el tiempo empleado en
+  // sus actividades (ver docs/decisiones-tecnicas.md DT-10).
+  fechaInicio    DateTime? @map("fecha_inicio")
 
   ruta   RutaAprendizaje @relation(fields: [idRuta], references: [idRuta], onDelete: Cascade)
   modulo Modulo          @relation(fields: [idModulo], references: [idModulo], onDelete: Restrict)

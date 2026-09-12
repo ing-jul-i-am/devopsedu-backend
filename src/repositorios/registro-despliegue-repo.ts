@@ -36,4 +36,15 @@ export class RegistroDespliegueRepo {
       orderBy: [{ fechaHora: "desc" }, { idRegistro: "desc" }],
     });
   }
+
+  // RF-23: usado por EvaluadorActividad para calcular "intentos" (exitos + fallos) de la
+  // operacion que acaba de cumplir el criterio de una actividad.
+  async contarPorServicioYOperacion(
+    idServicio: number,
+    operacion: string
+  ): Promise<number> {
+    return this.prisma.registroDespliegue.count({
+      where: { idServicio, operacion },
+    });
+  }
 }

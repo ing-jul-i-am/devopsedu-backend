@@ -24,11 +24,15 @@ base de datos y resincroniza automaticamente (ver 3.6):
   seccion 6.
 - DT-08: se agrega el grupo `/api/usuarios`, exclusivo del rol docente, con
   un unico endpoint de reseteo manual de contrasena. Ver seccion 7.
+- Etapa 6 (RF-23, CU-12, DT-10): se agrega `POST /api/modulos/:idModulo/actividades`
+  (docente, ver 4.6) y `POST /api/aprendizaje/modulos/:idModulo/iniciar`
+  (estudiante, ver 6.2). `RutaAprendizaje.progreso` ahora lo actualiza
+  `EvaluadorActividad` tras cada actividad completada.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
 Este documento describe **unicamente los endpoints ya implementados**. El resto
-de `/api/aprendizaje` (RF-23, RF-24) y `/api/reportes` (docente, RF-25, RF-26)
+de `/api/aprendizaje` (RF-24) y `/api/reportes` (docente, RF-25, RF-26)
 todavia no existen en el backend y no deben asumirse disponibles por el
 frontend. Cuando se implementen, este documento se actualizara.
 
@@ -460,15 +464,15 @@ sobrevive, usar `reiniciar`, no `desplegar`.
 
 ## 4. Modulos de aprendizaje — `/api/modulos`
 
-Cubre RF-20 — CU-10. Todas las rutas requieren autenticacion y estan restringidas
-al rol `docente` (`autorizar("docente")`); un estudiante recibe `403` en cualquiera
-de ellas.
+Cubre RF-20, RF-23 — CU-10, CU-12. Todas las rutas requieren autenticacion y estan
+restringidas al rol `docente` (`autorizar("docente")`); un estudiante recibe `403`
+en cualquiera de ellas.
 
 ### 4.1 Forma comun: objeto Modulo
 
 El contenido del modulo es un arreglo ordenado de bloques (el orden del arreglo
-es el orden de lectura); cada bloque es uno de tres tipos discriminados por el
-campo `tipo` (ver DT-09):
+es el orden de lectura); cada bloque es uno de cuatro tipos discriminados por el
+campo `tipo` (ver DT-09, DT-10):
 
 ```json
 {
@@ -477,7 +481,8 @@ campo `tipo` (ver DT-09):
   "contenido": [
     { "tipo": "texto", "contenido": "Los contenedores empaquetan una aplicacion y sus dependencias (Markdown)." },
     { "tipo": "imagen", "url": "/archivos/modulos/3f2a...c1.png", "textoAlternativo": "Diagrama de arquitectura" },
-    { "tipo": "enlace", "url": "https://docs.docker.com/", "titulo": "Documentacion oficial de Docker", "descripcion": "Referencia completa" }
+    { "tipo": "enlace", "url": "https://docs.docker.com/", "titulo": "Documentacion oficial de Docker", "descripcion": "Referencia completa" },
+    { "tipo": "actividad", "idActividad": 7 }
   ],
   "orden": 1
 }
@@ -490,6 +495,7 @@ Formas de bloque:
 | `texto` | `contenido: string` (Markdown, no vacio) |
 | `imagen` | `url: string` (ruta devuelta por 4.5), `textoAlternativo?: string` |
 | `enlace` | `url: string` (URL absoluta), `titulo: string`, `descripcion?: string` |
+| `actividad` | `idActividad: number` (entero positivo; referencia una Actividad creada con 4.6 para el mismo modulo) |
 
 ### 4.2 `GET /api/modulos`
 
@@ -568,6 +574,59 @@ del frontend no puede adjuntar el header `Authorization`.
 | `400` | No se adjunto ningun archivo, el tipo MIME no esta permitido, o el archivo excede 5 MB |
 | `401` / `403` | Igual que el resto del grupo |
 
+### 4.6 `POST /api/modulos/:idModulo/actividades`
+
+Crea una actividad practica dentro de un modulo, con los criterios que
+`EvaluadorActividad` aplicara automaticamente para marcarla completada (RF-23,
+ver DT-10). El `idActividad` devuelto se referencia luego desde un bloque
+`actividad` del `contenido` del modulo (ver 4.1).
+
+**Request body**
+
+```json
+{
+  "descripcion": "string, minimo 3 caracteres",
+  "criteriosValidacion": {
+    "operacion": "desplegar | detener | reiniciar | eliminar",
+    "condiciones": {
+      "imagenDocker": "string (opcional)",
+      "volumenesMinimos": "entero >= 0 (opcional)",
+      "puertosMinimos": "entero >= 0 (opcional)",
+      "cpuMinimo": "numero > 0 (opcional)",
+      "memoriaMinima": "entero > 0 (opcional)"
+    }
+  },
+  "orden": "entero > 0"
+}
+```
+
+`condiciones` es opcional en su totalidad; cada campo dentro de ella tambien lo
+es. Si se omite `condiciones`, el criterio se cumple con solo ejecutar la
+`operacion` indicada sobre cualquier servicio propio del estudiante.
+
+**Response `201 Created`**
+
+```json
+{
+  "idActividad": 7,
+  "descripcion": "Despliega un servicio con nginx y al menos un volumen",
+  "criteriosValidacion": {
+    "operacion": "desplegar",
+    "condiciones": { "imagenDocker": "nginx", "volumenesMinimos": 1 }
+  },
+  "orden": 1,
+  "idModulo": 3
+}
+```
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Cuerpo invalido (ver 1.4): falta algun campo requerido, `operacion` no reconocida, o algun campo de `condiciones` con tipo o rango invalido |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoEncontradoError` — no existe un modulo con ese `idModulo` |
+
 ---
 
 ## 5. Rutas de aprendizaje — `/api/rutas`
@@ -618,15 +677,17 @@ ruta (viola la llave primaria compuesta de `ruta_modulo`).
 
 ## 6. Aprendizaje del estudiante — `/api/aprendizaje`
 
-Cubre RF-22 — CU-13. Todas las rutas requieren autenticacion y estan restringidas
-al rol `estudiante`; un docente recibe `403`.
+Cubre RF-22, RF-23 — CU-13, CU-12. Todas las rutas requieren autenticacion y estan
+restringidas al rol `estudiante`; un docente recibe `403`.
 
 ### 6.1 `GET /api/aprendizaje/mi-ruta`
 
 Devuelve la ruta de aprendizaje mas reciente asignada al estudiante autenticado
 (ver 5.1), con sus modulos en el orden de la secuencia y el nombre de cada uno.
-`progreso` es el campo persistido en `RutaAprendizaje` (aun no lo actualiza
-ningun endpoint; queda en `0` hasta que se implemente RF-23/RF-24).
+`progreso` es el campo persistido en `RutaAprendizaje`, actualizado por
+`EvaluadorActividad` cada vez que se completa una actividad (RF-23, ver DT-10):
+`(actividades completadas) / (total de actividades de la ruta) * 100`. Las
+evaluaciones de modulo (RF-24, aun no implementado) todavia no se cuentan.
 
 **Response `200 OK`** (con ruta asignada)
 
@@ -645,6 +706,25 @@ ningun endpoint; queda en `0` hasta que se implemente RF-23/RF-24).
 **Response `200 OK`** (sin ninguna ruta asignada todavia): `null`.
 
 **Errores posibles**: `401`, `403`.
+
+### 6.2 `POST /api/aprendizaje/modulos/:idModulo/iniciar`
+
+Marca que el estudiante llego al modulo indicado, para que `EvaluadorActividad`
+pueda calcular `tiempoEmpleado` de sus actividades (RF-23, ver DT-10). Es
+idempotente: llamarlo varias veces no reinicia la fecha ya registrada.
+
+**Response `200 OK`**
+
+```json
+{ "mensaje": "Modulo iniciado" }
+```
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `ModuloNoAsignadoError` — el `idModulo` no pertenece a la ruta activa del estudiante (o no tiene ninguna ruta asignada) |
 
 ---
 
@@ -722,6 +802,7 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `PermisoDenegadoError` | 403 | `No tiene permiso para realizar esta accion` | — |
 | `ServicioNoEncontradoError` | 404 | `Servicio no encontrado` | — |
 | `ModuloNoEncontradoError` | 404 | `Modulo no encontrado` | — |
+| `ModuloNoAsignadoError` | 404 | `El modulo no pertenece a tu ruta de aprendizaje` | — |
 | `ContenedorNoEncontradoError` | 404 | `El contenedor del servicio no existe` | — |
 | `UsuarioNoEncontradoError` | 404 | `Usuario no encontrado` | — |
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
@@ -757,8 +838,10 @@ No implementado aun en el backend (no invocar desde el frontend todavia):
   el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
 - Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
   DT-08 para la relacion con el reseteo administrativo actual).
-- Resto de `/api/aprendizaje/*` (estudiante, RF-23, RF-24, CU-12, CU-14): solo
-  `GET /api/aprendizaje/mi-ruta` (RF-22, CU-13) esta implementado, ver seccion 6.
+- Resto de `/api/aprendizaje/*` (estudiante, RF-24, CU-14 — evaluaciones de
+  modulo): `GET /api/aprendizaje/mi-ruta` (RF-22) y `POST
+  /api/aprendizaje/modulos/:idModulo/iniciar` (RF-23) ya estan implementados,
+  ver seccion 6.
 - `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16)
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por

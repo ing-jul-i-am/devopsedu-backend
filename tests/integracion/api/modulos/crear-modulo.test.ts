@@ -9,6 +9,7 @@ import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
 import { crearUsuarioConRol } from "../../../ayudas/crear-usuario-con-rol.js";
 import {
+  bloqueActividad,
   bloqueEnlace,
   bloqueImagen,
   bloqueTexto,
@@ -78,6 +79,42 @@ describe("POST /api/modulos", () => {
     // Assert
     expect(respuesta.status).toBe(201);
     expect(respuesta.body.contenido).toEqual(contenido);
+  });
+
+  it("acepta un bloque de tipo actividad referenciando una actividad existente", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+    const contenido = [bloqueTexto(), bloqueActividad({ idActividad: 42 })];
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(datosModuloValidos({ contenido }));
+
+    // Assert
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.contenido).toEqual(contenido);
+  });
+
+  it("rechaza con 400 cuando un bloque de actividad no trae idActividad", async () => {
+    // Arrange
+    await crearUsuarioConRol(DOCENTE, "docente");
+    const token = await obtenerToken(DOCENTE);
+
+    // Act
+    const respuesta = await request(app)
+      .post("/api/modulos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(
+        datosModuloValidos({
+          contenido: [{ tipo: "actividad" } as never],
+        })
+      );
+
+    // Assert
+    expect(respuesta.status).toBe(400);
   });
 
   it("rechaza con 403 cuando el usuario es estudiante", async () => {

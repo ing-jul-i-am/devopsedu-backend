@@ -333,3 +333,64 @@ esta decision: por ahora solo se expande la gestion del lado del docente.
   `express.static` publico. Descartada porque un `<img src>` no adjunta headers personalizados
   sin trabajo adicional en el frontend (fetch + blob URL), y el contenido no se considera
   sensible en este prototipo.
+
+## DT-10: criterios de validacion automatica de actividades (RF-23)
+
+**Fecha:** 2026-09-12
+
+**Contexto:** RF-23 (validacion automatica de actividades, CU-12) estaba pendiente porque el
+documento de diseno no especifica que forma tiene `Actividad.criteriosValidacion` ni contra que
+datos del sistema se evalua el cumplimiento de una actividad. Tampoco existia ningun mecanismo
+para que el docente definiera actividades (RF-20 solo cubrio `Modulo`). Estas decisiones se
+tomaron junto al desarrollador antes de iniciar TDD.
+
+**Decision:**
+1. **Forma de `criteriosValidacion` (Json).** `{ operacion: "desplegar"|"detener"|"reiniciar"|"eliminar", condiciones?: { imagenDocker?, volumenesMinimos?, puertosMinimos?, cpuMinimo?, memoriaMinima? } }`.
+   Todas las condiciones son opcionales. El tipo de dominio vive en
+   `src/dominio/modelos/criterios-validacion.ts` y el esquema Zod en
+   `src/api/validadores/actividades/crear-actividad.validador.ts`.
+2. **Disparador automatico.** `GestorDocker` invoca a `EvaluadorActividad.evaluarTrasOperacion`
+   tras cada operacion exitosa (`desplegar`/`detener`/`reiniciar`/`eliminar`), envuelto en
+   `try/catch`: un fallo en la evaluacion nunca revierte una operacion Docker que ya tuvo exito
+   (se registra con `logger.warn`, evento `evaluacion_actividad_fallida`).
+3. **Alcance de la evidencia.** No se vincula `Actividad` a un `Servicio` especifico. El
+   criterio se evalua contra la configuracion vigente de cualquier servicio propio del
+   estudiante sobre el que se acaba de ejecutar la operacion.
+4. **Actividad en curso.** Dentro del modulo en curso (el primero, por
+   `RutaModulo.ordenSecuencia`, con alguna actividad sin `Resultado`), la actividad en curso es
+   la primera pendiente por campo `orden`. Solo esa se evalua en cada llamada.
+5. **`intentos`.** Cantidad de `RegistroDespliegue` (exito + fallo) de esa `operacion` sobre ese
+   `idServicio`, hasta el que cumple el criterio (`RegistroDespliegueRepo.contarPorServicioYOperacion`).
+6. **`tiempoEmpleado` y nuevo campo `RutaModulo.fechaInicio`.** Se agrega
+   `RutaModulo.fechaInicio` (`DateTime?`, migracion `20260912181406_agrega_fecha_inicio_ruta_modulo`)
+   para marcar cuando el estudiante llega al modulo. Se marca mediante un endpoint explicito
+   (`POST /api/aprendizaje/modulos/:idModulo/iniciar`), idempotente: no se sobrescribe si ya
+   tenia fecha. `tiempoEmpleado` es la diferencia en segundos entre esa fecha y el momento en
+   que se cumple el criterio; si no hay fecha registrada (caso borde), `tiempoEmpleado = 0`.
+7. **Nuevo bloque de contenido `actividad`.** Se agrega a `BloqueContenido` (junto a
+   `texto`/`imagen`/`enlace`), con forma `{ tipo: "actividad", idActividad: number }`, para
+   marcar donde aparece la actividad dentro de la lectura lineal del modulo. Referencia una
+   `Actividad` ya creada para el mismo modulo mediante `POST /api/modulos/:idModulo/actividades`
+   (endpoint nuevo, exclusivo del rol docente, ya que RF-20 no lo cubria).
+8. **Progreso de `RutaAprendizaje`.** `(actividades con Resultado del usuario) / (total de
+   actividades en todos los modulos de la ruta) * 100`, recalculado por `EvaluadorActividad`
+   tras cada actividad completada.
+
+**Consecuencias:** El calculo de progreso no cuenta evaluaciones (RF-24, aun no implementado);
+cuando se aborde RF-24 habra que decidir si se integra al mismo porcentaje o se reporta aparte.
+`tiempoEmpleado` puede incluir tiempo en que el estudiante no estuvo activo en la plataforma
+(no hay pausas), y si tiene mas de un modulo activo simultaneamente el tiempo se cuenta desde
+que llego a ese modulo especifico, no desde el inicio de la ruta completa. La evaluacion no
+distingue si el servicio usado ya existia antes de la actividad o fue creado especificamente
+para ella (alcance "cualquier servicio propio" acordado con el desarrollador).
+
+**Alternativas consideradas:**
+- Vincular `Actividad` a un `Servicio` especifico mediante una FK. Descartada porque obligaria
+  a crear el servicio antes de la actividad y complicaria el flujo del estudiante; el criterio
+  por `operacion + condiciones` ya acota suficientemente que servicio cuenta.
+- Evaluacion bajo demanda (endpoint que el estudiante llama para "verificar" su actividad).
+  Descartada porque el flujo narrativo de CU-12 describe una evaluacion automatica inmediata
+  tras la accion del estudiante, sin paso manual adicional.
+- Contar `intentos` siempre como 1 (sin consultar el historico). Descartada porque el
+  desarrollador prefirio una metrica mas fiel al numero real de intentos sobre el servicio
+  usado, aun a costa de poder sobreestimar si ese servicio se reutilizo para otros fines.

@@ -4,7 +4,9 @@
 // deja huella de cada operacion (RF-15) y verifica recursos antes de desplegar (RF-09/CU-04).
 // Permite reiniciar un servicio en estado fallido: el contenedor puede seguir existiendo aunque
 // el monitor lo haya marcado fallido por detenerse fuera de la plataforma (RF-19).
-// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19 — CU-05
+// Tras cada operacion exitosa dispara la evaluacion automatica de actividades del estudiante
+// (RF-23); un fallo del evaluador nunca revierte una operacion Docker que ya tuvo exito.
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19, RF-23 — CU-05, CU-12
 
 import type { Servicio } from "@prisma/client";
 import type {
@@ -13,6 +15,7 @@ import type {
 } from "../repositorios/servicio-repo.js";
 import type { RegistroDespliegueRepo } from "../repositorios/registro-despliegue-repo.js";
 import type { VerificadorRecursos } from "./verificador-recursos.js";
+import type { EvaluadorActividad } from "./evaluador-actividad.js";
 import type { ParametrosContenedor } from "../docker/cliente-docker.js";
 import {
   nombreContenedor,
@@ -26,6 +29,7 @@ import { ServicioNoEncontradoError } from "../dominio/errores/servicio-no-encont
 import { RecursosInsuficientesError } from "../dominio/errores/recursos-insuficientes-error.js";
 import { TransicionInvalidaError } from "../dominio/errores/transicion-invalida-error.js";
 import { ContenedorNoEncontradoError } from "../dominio/errores/contenedor-no-encontrado-error.js";
+import { logger } from "../infraestructura/logger.js";
 
 // Estados de origen validos por operacion, conforme a la maquina de estados (seccion 4.2.14).
 const ORIGENES_VALIDOS: Record<string, string[]> = {
@@ -52,6 +56,7 @@ export interface DependenciasGestorDocker {
   >;
   registroRepo: Pick<RegistroDespliegueRepo, "registrar">;
   verificador: Pick<VerificadorRecursos, "verificarDisponibilidad">;
+  evaluador: Pick<EvaluadorActividad, "evaluarTrasOperacion">;
 }
 
 export class GestorDocker {
@@ -90,6 +95,7 @@ export class GestorDocker {
         "en_ejecucion"
       );
       await this.registrar(idServicio, idUsuario, "desplegar", "exito");
+      await this.evaluarActividades(idUsuario, idServicio, "desplegar");
       return actualizado;
     } catch (error) {
       await this.dep.servicioRepo.actualizarEstado(idServicio, "fallido");
@@ -116,6 +122,7 @@ export class GestorDocker {
         "detenido"
       );
       await this.registrar(idServicio, idUsuario, "detener", "exito");
+      await this.evaluarActividades(idUsuario, idServicio, "detener");
       return actualizado;
     } catch (error) {
       // La detencion fallida conserva el estado actual (seccion 4.2.14) y deja registro.
@@ -144,6 +151,7 @@ export class GestorDocker {
         "en_ejecucion"
       );
       await this.registrar(idServicio, idUsuario, "reiniciar", "exito");
+      await this.evaluarActividades(idUsuario, idServicio, "reiniciar");
       return actualizado;
     } catch (error) {
       await this.dep.servicioRepo.actualizarEstado(idServicio, "fallido");
@@ -185,6 +193,7 @@ export class GestorDocker {
       "eliminado"
     );
     await this.registrar(idServicio, idUsuario, "eliminar", "exito");
+    await this.evaluarActividades(idUsuario, idServicio, "eliminar");
     return actualizado;
   }
 
@@ -222,6 +231,29 @@ export class GestorDocker {
         config.variablesEntorno as unknown as ParametrosContenedor["variablesEntorno"],
       volumenes: config.volumenes as unknown as ParametrosContenedor["volumenes"],
     };
+  }
+
+  // RF-23: un fallo aqui no debe hacer fallar la operacion Docker que ya tuvo exito.
+  private async evaluarActividades(
+    idUsuario: number,
+    idServicio: number,
+    operacion: string
+  ): Promise<void> {
+    try {
+      await this.dep.evaluador.evaluarTrasOperacion(
+        idUsuario,
+        idServicio,
+        operacion
+      );
+    } catch (error) {
+      logger.warn({
+        evento: "evaluacion_actividad_fallida",
+        idUsuario,
+        idServicio,
+        operacion,
+        error: mensajeDe(error),
+      });
+    }
   }
 
   private async registrar(

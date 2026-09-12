@@ -1,7 +1,7 @@
 // tests/unitarias/servicios-aplicacion/gestor-docker.test.ts
 // Pruebas unitarias del GestorDocker: orquesta cliente-docker, repositorios y transiciones de
 // estado. Se mockea cliente-docker (no dockerode) y los repositorios.
-// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19 — CU-05
+// Cubre: RF-11, RF-12, RF-13, RF-14, RF-15, RF-19, RF-23 — CU-05, CU-12
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -29,6 +29,7 @@ function crearDeps() {
     },
     registroRepo: { registrar: vi.fn() },
     verificador: { verificarDisponibilidad: vi.fn() },
+    evaluador: { evaluarTrasOperacion: vi.fn().mockResolvedValue(undefined) },
   };
 }
 
@@ -323,6 +324,68 @@ describe("GestorDocker", () => {
       await expect(crearGestor(dep).eliminar(5, 1)).rejects.toBeInstanceOf(
         TransicionInvalidaError
       );
+    });
+  });
+
+  describe("evaluacion automatica de actividades (RF-23)", () => {
+    it("invoca a evaluarTrasOperacion tras desplegar con exito", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio()
+      );
+      dep.verificador.verificarDisponibilidad.mockResolvedValue({
+        aprobado: true,
+        solicitado: {},
+        disponible: {},
+      });
+      vi.mocked(clienteDocker.crearContenedor).mockResolvedValue("cid");
+      vi.mocked(clienteDocker.iniciarContenedor).mockResolvedValue(undefined);
+
+      await crearGestor(dep).desplegar(5, 1);
+
+      expect(dep.evaluador.evaluarTrasOperacion).toHaveBeenCalledWith(
+        5,
+        1,
+        "desplegar"
+      );
+    });
+
+    it("no invoca al evaluador cuando la operacion falla", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio()
+      );
+      dep.verificador.verificarDisponibilidad.mockResolvedValue({
+        aprobado: true,
+        solicitado: {},
+        disponible: {},
+      });
+      vi.mocked(clienteDocker.crearContenedor).mockRejectedValue(
+        new Error("falla docker")
+      );
+
+      await expect(crearGestor(dep).desplegar(5, 1)).rejects.toThrow();
+
+      expect(dep.evaluador.evaluarTrasOperacion).not.toHaveBeenCalled();
+    });
+
+    it("no rompe la respuesta cuando el evaluador de actividades falla", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio()
+      );
+      dep.verificador.verificarDisponibilidad.mockResolvedValue({
+        aprobado: true,
+        solicitado: {},
+        disponible: {},
+      });
+      vi.mocked(clienteDocker.crearContenedor).mockResolvedValue("cid");
+      vi.mocked(clienteDocker.iniciarContenedor).mockResolvedValue(undefined);
+      dep.evaluador.evaluarTrasOperacion.mockRejectedValue(
+        new Error("fallo inesperado del evaluador")
+      );
+
+      await expect(crearGestor(dep).desplegar(5, 1)).resolves.toBeDefined();
     });
   });
 });

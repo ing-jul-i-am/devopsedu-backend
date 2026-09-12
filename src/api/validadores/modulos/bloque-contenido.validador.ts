@@ -22,6 +22,11 @@ const bloqueEnlaceSchema = z.object({
   descripcion: z.string().max(500).optional(),
 });
 
+const bloqueActividadSchema = z.object({
+  tipo: z.literal("actividad"),
+  idActividad: z.number().int().positive(),
+});
+
 // La anotacion de tipo obliga a que este esquema implemente exactamente el discriminated union
 // de dominio: si BloqueContenido cambia sin actualizar el esquema, esto deja de compilar.
 export const bloqueContenidoSchema: z.ZodType<BloqueContenido> =
@@ -29,6 +34,7 @@ export const bloqueContenidoSchema: z.ZodType<BloqueContenido> =
     bloqueTextoSchema,
     bloqueImagenSchema,
     bloqueEnlaceSchema,
+    bloqueActividadSchema,
   ]);
 
 export type BloqueContenidoDTO = z.infer<typeof bloqueContenidoSchema>;
