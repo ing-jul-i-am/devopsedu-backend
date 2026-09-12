@@ -48,6 +48,14 @@ export class GestorModulos {
     return this.dep.moduloRepo.listarTodos();
   }
 
+  async obtenerPorId(idModulo: number): Promise<Modulo> {
+    const modulo = await this.dep.moduloRepo.buscarPorId(idModulo);
+    if (!modulo) {
+      throw new ModuloNoEncontradoError();
+    }
+    return modulo;
+  }
+
   async editar(idModulo: number, datos: Partial<DatosModulo>): Promise<Modulo> {
     const existente = await this.dep.moduloRepo.buscarPorId(idModulo);
     if (!existente) {

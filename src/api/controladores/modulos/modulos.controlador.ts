@@ -49,6 +49,7 @@ function aEvaluacionRespuesta(evaluacion: Evaluacion) {
 export function crearControladoresModulos(gestorModulos: GestorModulos): {
   crear: RequestHandler;
   listar: RequestHandler;
+  obtener: RequestHandler;
   editar: RequestHandler;
   subirImagen: RequestHandler;
   crearActividad: RequestHandler;
@@ -67,6 +68,16 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
     try {
       const modulos = await gestorModulos.listarTodos();
       res.status(200).json(modulos.map(aModuloRespuesta));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  const obtener: RequestHandler = async (req, res, next) => {
+    try {
+      const idModulo = idModuloDe(req);
+      const modulo = await gestorModulos.obtenerPorId(idModulo);
+      res.status(200).json(aModuloRespuesta(modulo));
     } catch (error) {
       next(error);
     }
@@ -108,5 +119,13 @@ export function crearControladoresModulos(gestorModulos: GestorModulos): {
     }
   };
 
-  return { crear, listar, editar, subirImagen, crearActividad, crearEvaluacion };
+  return {
+    crear,
+    listar,
+    obtener,
+    editar,
+    subirImagen,
+    crearActividad,
+    crearEvaluacion,
+  };
 }

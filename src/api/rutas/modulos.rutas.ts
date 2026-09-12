@@ -25,6 +25,7 @@ export function crearRutasModulos(
   router.get("/", autenticar, rol, c.listar);
   router.post("/", autenticar, rol, validar(crearModuloSchema), c.crear);
   router.post("/imagenes", autenticar, rol, subirImagenModulo, c.subirImagen);
+  router.get("/:idModulo", autenticar, rol, c.obtener);
   router.put(
     "/:idModulo",
     autenticar,

@@ -60,6 +60,38 @@ describe("GestorModulos", () => {
     });
   });
 
+  describe("obtenerPorId", () => {
+    it("devuelve el modulo cuando existe", async () => {
+      // Arrange
+      const dep = crearDependenciasMock();
+      dep.moduloRepo.buscarPorId.mockResolvedValue({
+        idModulo: 1,
+        ...datosModuloValidos(),
+      });
+      const gestor = new GestorModulos(dep as any);
+
+      // Act
+      const modulo = await gestor.obtenerPorId(1);
+
+      // Assert
+      expect(dep.moduloRepo.buscarPorId).toHaveBeenCalledWith(1);
+      expect(modulo.idModulo).toBe(1);
+    });
+
+    it("lanza ModuloNoEncontradoError cuando el modulo no existe", async () => {
+      // Arrange
+      const dep = crearDependenciasMock();
+      dep.moduloRepo.buscarPorId.mockResolvedValue(null);
+      const gestor = new GestorModulos(dep as any);
+
+      // Act
+      const intento = gestor.obtenerPorId(999);
+
+      // Assert
+      await expect(intento).rejects.toBeInstanceOf(ModuloNoEncontradoError);
+    });
+  });
+
   describe("editar", () => {
     it("actualiza el modulo cuando existe", async () => {
       // Arrange
