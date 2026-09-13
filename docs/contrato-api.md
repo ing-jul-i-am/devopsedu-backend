@@ -33,6 +33,8 @@ base de datos y resincroniza automaticamente (ver 3.6):
   (estudiante, ver 6.3). Con esto la Etapa 6 (componente educativo) queda
   completa. `RutaAprendizaje.progreso` ahora combina actividades y
   evaluaciones aprobadas (`CalculadorProgreso`).
+- RF-22, DT-13: `GET /api/aprendizaje/mi-ruta` agrega `estado` a cada modulo
+  de `modulos[]` (`"completado" | "en_progreso" | "sin_iniciar"`). Ver 6.1.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -763,6 +765,11 @@ aprueba una evaluacion (RF-24, ver DT-11):
 `(actividades completadas + evaluaciones aprobadas) / (total de actividades +
 total de evaluaciones de la ruta) * 100`.
 
+Cada modulo trae ademas `estado`: `"sin_iniciar"` si `fechaInicio` es null;
+si el modulo ya fue iniciado, `"completado"` cuando todas sus actividades
+tienen resultado y (si tiene evaluacion) esta fue aprobada, o `"en_progreso"`
+en caso contrario (ver DT-13).
+
 **Response `200 OK`** (con ruta asignada)
 
 ```json
@@ -771,8 +778,8 @@ total de evaluaciones de la ruta) * 100`.
   "progreso": 0,
   "fechaAsignacion": "2026-08-28T00:00:00.000Z",
   "modulos": [
-    { "idModulo": 3, "nombre": "Redes en Docker", "ordenSecuencia": 1 },
-    { "idModulo": 1, "nombre": "Introduccion a contenedores", "ordenSecuencia": 2 }
+    { "idModulo": 3, "nombre": "Redes en Docker", "ordenSecuencia": 1, "estado": "en_progreso" },
+    { "idModulo": 1, "nombre": "Introduccion a contenedores", "ordenSecuencia": 2, "estado": "sin_iniciar" }
   ]
 }
 ```

@@ -2,7 +2,7 @@
 // Servicio de aplicacion para las acciones del estudiante sobre su propia ruta de aprendizaje.
 // Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
 
-import type { Evaluacion, RutaModulo, Modulo, Actividad } from "@prisma/client";
+import type { Evaluacion, RutaAprendizaje, RutaModulo, Modulo, Actividad } from "@prisma/client";
 import type {
   RutaAprendizajeRepo,
   RutaAprendizajeConModulosDetalle,
@@ -12,6 +12,8 @@ import type { ResultadoRepo } from "../repositorios/resultado-repo.js";
 import type { ActividadRepo } from "../repositorios/actividad-repo.js";
 import type { CalculadorProgreso } from "./calculador-progreso.js";
 import type { PreguntaEvaluacion } from "../dominio/modelos/pregunta-evaluacion.js";
+import type { EstadoModulo } from "../dominio/estado-modulo.js";
+import { calcularEstadoModulo } from "../dominio/estado-modulo.js";
 import { ModuloNoAsignadoError } from "../dominio/errores/modulo-no-asignado-error.js";
 import { EvaluacionNoEncontradaError } from "../dominio/errores/evaluacion-no-encontrada-error.js";
 import { EvaluacionNoDisponibleError } from "../dominio/errores/evaluacion-no-disponible-error.js";
@@ -34,6 +36,7 @@ export interface DependenciasGestorAprendizaje {
     | "crearParaEvaluacion"
     | "contarIntentosPorUsuarioYEvaluacion"
     | "existeAprobadaPorUsuarioYEvaluacion"
+    | "contarActividadesCompletadasEnRuta"
   >;
   calculadorProgreso: Pick<CalculadorProgreso, "recalcular">;
   actividadRepo: Pick<ActividadRepo, "listarPorModulo">;
@@ -45,6 +48,15 @@ export interface ModuloConActividades {
   fechaInicio: Date | null;
 }
 
+export type RutaModuloConEstado = RutaModulo & {
+  modulo: Modulo;
+  estado: EstadoModulo;
+};
+
+export type RutaAprendizajeConEstadoDeModulos = RutaAprendizaje & {
+  rutaModulos: RutaModuloConEstado[];
+};
+
 export interface RetroalimentacionEvaluacion {
   puntuacion: number;
   aprobado: boolean;
@@ -55,10 +67,60 @@ export interface RetroalimentacionEvaluacion {
 export class GestorAprendizaje {
   constructor(private readonly dep: DependenciasGestorAprendizaje) {}
 
+  // RF-22: adjunta a cada modulo de la ruta su estado de progreso (ver
+  // src/dominio/estado-modulo.ts y DT-13). Loop secuencial, consistente con el estilo de
+  // CalculadorProgreso.recalcular y EvaluadorActividad.buscarActividadEnCurso.
   async obtenerMiRuta(
     idUsuario: number
-  ): Promise<RutaAprendizajeConModulosDetalle | null> {
-    return this.dep.rutaRepo.buscarUltimaPorUsuario(idUsuario);
+  ): Promise<RutaAprendizajeConEstadoDeModulos | null> {
+    const ruta = await this.dep.rutaRepo.buscarUltimaPorUsuario(idUsuario);
+    if (!ruta) {
+      return null;
+    }
+
+    const rutaModulos: RutaModuloConEstado[] = [];
+    for (const rutaModulo of ruta.rutaModulos) {
+      const estado = await this.calcularEstadoDeModulo(idUsuario, rutaModulo);
+      rutaModulos.push({ ...rutaModulo, estado });
+    }
+
+    return { ...ruta, rutaModulos };
+  }
+
+  private async calcularEstadoDeModulo(
+    idUsuario: number,
+    rutaModulo: RutaModulo
+  ): Promise<EstadoModulo> {
+    const actividades = await this.dep.actividadRepo.listarPorModulo(
+      rutaModulo.idModulo
+    );
+    const idsActividad = actividades.map((actividad) => actividad.idActividad);
+    const actividadesCompletadas =
+      idsActividad.length > 0
+        ? await this.dep.resultadoRepo.contarActividadesCompletadasEnRuta(
+            idUsuario,
+            idsActividad
+          )
+        : 0;
+
+    const evaluacion = await this.dep.evaluacionRepo.buscarPorModulo(
+      rutaModulo.idModulo
+    );
+    const evaluacionAprobada = evaluacion
+      ? await this.dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion(
+          idUsuario,
+          evaluacion.idEvaluacion,
+          UMBRAL_APROBACION_EVALUACION
+        )
+      : false;
+
+    return calcularEstadoModulo({
+      totalActividadesReferenciadas: idsActividad.length,
+      actividadesCompletadas,
+      tieneEvaluacion: evaluacion !== null,
+      evaluacionAprobada,
+      fechaInicio: rutaModulo.fechaInicio,
+    });
   }
 
   // RF-23: marca cuando el estudiante llega al modulo, para calcular el tiempo empleado en sus

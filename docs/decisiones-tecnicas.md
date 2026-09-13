@@ -513,3 +513,52 @@ verificando el codigo de estado HTTP.
 - Dejar que `process.on("unhandledRejection")` solo loguee sin terminar el proceso. Descartada
   para no dejar el proceso en un estado inconsistente distinto al comportamiento por defecto de
   Node ante una promesa rechazada sin manejar.
+
+## DT-13: estado de progreso por modulo en GET /api/aprendizaje/mi-ruta (RF-22)
+
+**Fecha:** 2026-09-12
+
+**Contexto:** El frontend necesitaba saber, para cada modulo de `modulos[]` en
+`GET /api/aprendizaje/mi-ruta`, si el estudiante ya lo completo, lo tiene en progreso o no lo
+ha iniciado. La respuesta solo traia `idModulo`, `nombre` y `ordenSecuencia`; el unico progreso
+expuesto era el `progreso` agregado de toda la ruta (`CalculadorProgreso`, ver DT-11).
+
+**Decision:** Se agrego un campo `estado: "completado" | "en_progreso" | "sin_iniciar"` a cada
+elemento de `modulos[]`, calculado por una regla de dominio pura y nueva,
+`calcularEstadoModulo` (`src/dominio/estado-modulo.ts`):
+
+1. `RutaModulo.fechaInicio` actua como requisito previo (gate), no solo como criterio de
+   desempate: si es `null`, el estado es siempre `"sin_iniciar"`, sin importar si hay
+   actividades o evaluaciones ya completadas.
+2. Solo si el modulo fue iniciado se evalua la completitud: `"completado"` cuando todas las
+   `Actividad` ligadas al modulo (mismo criterio que ya usan `CalculadorProgreso` y
+   `EvaluadorActividad`, ver DT-10/DT-11) tienen un `Resultado` del estudiante, y si el modulo
+   tiene `Evaluacion`, esta fue aprobada (`puntuacion >= UMBRAL_APROBACION_EVALUACION`).
+   Cualquier otro caso (iniciado pero incompleto) es `"en_progreso"`.
+
+Un modulo sin actividades ni evaluacion (puramente de lectura) queda `"sin_iniciar"` mientras
+no se inicie, y pasa directo a `"completado"` en cuanto se inicia: la condicion de completitud
+se cumple vacuamente (nada pendiente). Esto se resolvio de forma natural gracias al gate de
+`fechaInicio` (punto 1), sin necesitar una excepcion especial para modulos vacios.
+
+El calculo vive en `GestorAprendizaje.obtenerMiRuta` (`src/servicios-aplicacion/gestor-aprendizaje.ts`),
+en un loop secuencial sobre los modulos de la ruta — mismo estilo que
+`CalculadorProgreso.recalcular` y `EvaluadorActividad.buscarActividadEnCurso`, para mantener
+consistencia con el resto del codigo en lugar de paralelizar con `Promise.all`.
+
+**Consecuencias:** `ResultadoRepo.contarActividadesCompletadasEnRuta` gana un segundo
+consumidor (antes solo lo usaba `CalculadorProgreso`); el metodo no usa `distinct`, por lo que
+si alguna vez existieran multiples `Resultado` por la misma actividad y usuario, el conteo
+podria alcanzar el total sin que todas las actividades distintas esten cubiertas. Hoy esto no
+ocurre porque el flujo de completar una actividad es idempotente de facto. El endpoint no
+cambia su codigo de estado ni su estructura general, solo agrega el campo `estado` por modulo.
+
+**Alternativas consideradas:**
+- Chequear "completado" con prioridad sobre `fechaInicio` (como se penso inicialmente), y
+  agregar una excepcion especial solo para modulos sin actividades ni evaluacion. Descartada
+  por el desarrollador: el gate de `fechaInicio` sobre todo el calculo es mas simple y cubre el
+  caso de esquina sin reglas adicionales.
+- Parsear `modulo.contenido` (JSON) y filtrar los bloques `tipo: "actividad"` como fuente de
+  verdad de "actividades referenciadas", en vez de `actividadRepo.listarPorModulo`. Descartada
+  para no introducir una segunda fuente de verdad que podria desincronizarse de la tabla
+  `Actividad` (el invariante de DT-10 ya asume que coinciden).

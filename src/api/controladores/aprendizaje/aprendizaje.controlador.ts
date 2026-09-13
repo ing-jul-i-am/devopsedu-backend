@@ -6,8 +6,11 @@
 
 import type { RequestHandler, Request } from "express";
 import type { Evaluacion, Actividad } from "@prisma/client";
-import type { GestorAprendizaje, ModuloConActividades } from "../../../servicios-aplicacion/gestor-aprendizaje.js";
-import type { RutaAprendizajeConModulosDetalle } from "../../../repositorios/ruta-aprendizaje-repo.js";
+import type {
+  GestorAprendizaje,
+  ModuloConActividades,
+  RutaAprendizajeConEstadoDeModulos,
+} from "../../../servicios-aplicacion/gestor-aprendizaje.js";
 import type { PreguntaEvaluacion } from "../../../dominio/modelos/pregunta-evaluacion.js";
 import type { BloqueContenido } from "../../../dominio/modelos/bloque-contenido.js";
 import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
@@ -29,7 +32,7 @@ function idModuloDe(req: Request): number {
   return id;
 }
 
-function aRutaRespuesta(ruta: RutaAprendizajeConModulosDetalle) {
+function aRutaRespuesta(ruta: RutaAprendizajeConEstadoDeModulos) {
   return {
     idRuta: ruta.idRuta,
     progreso: Number(ruta.progreso),
@@ -38,6 +41,7 @@ function aRutaRespuesta(ruta: RutaAprendizajeConModulosDetalle) {
       idModulo: rm.idModulo,
       nombre: rm.modulo.nombre,
       ordenSecuencia: rm.ordenSecuencia,
+      estado: rm.estado,
     })),
   };
 }
