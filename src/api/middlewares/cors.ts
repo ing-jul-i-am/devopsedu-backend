@@ -10,7 +10,7 @@ import type { RequestHandler } from "express";
 export function crearCors(origenesPermitidos: string[]): RequestHandler {
   const opciones: CorsOptions = {
     origin: origenesPermitidos,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   };
 

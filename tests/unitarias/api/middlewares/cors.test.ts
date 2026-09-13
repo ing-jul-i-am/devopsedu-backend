@@ -56,4 +56,19 @@ describe("crearCors", () => {
       "POST"
     );
   });
+
+  it("incluye PATCH entre los metodos permitidos del preflight", async () => {
+    const app = crearAppDePrueba(["http://localhost:5173"]);
+
+    const respuesta = await request(app)
+      .options("/recurso")
+      .set("Origin", "http://localhost:5173")
+      .set("Access-Control-Request-Method", "PATCH")
+      .set("Access-Control-Request-Headers", "authorization,content-type");
+
+    expect(respuesta.status).toBe(204);
+    expect(respuesta.headers["access-control-allow-methods"]).toContain(
+      "PATCH"
+    );
+  });
 });
