@@ -455,3 +455,61 @@ hacerse en `CalculadorProgreso` para que ambos flujos (RF-23 y RF-24) se manteng
 - Mantener el progreso de RF-23 sin tocar y reportar las evaluaciones aprobadas por separado.
   Descartada porque el desarrollador prefirio una sola metrica de progreso visible en
   `GET /api/aprendizaje/mi-ruta`, coherente con RF-22.
+
+---
+
+## DT-12: Cobertura completa de logging para errores controlados y no controlados
+
+**Fecha:** 2026-09-12
+
+**Contexto:** El desarrollador reporto que, al probar el servicio, no todos los errores dejaban
+un rastro en consola para poder trazar que fallo. Al revisar
+`src/api/middlewares/manejador-errores.ts` se confirmo que ya existia un catch-all
+(`logger.error({ evento: "error_no_controlado", err })`) para cualquier error no controlado, y
+que 6 de las ~17 ramas de errores de dominio ya llamaban al logger — pero las ramas restantes
+(404, 409, 422 y varias 400) respondian al cliente sin registrar nada. Ademas,
+`GestorDocker.desplegar/detener/reiniciar/eliminar` (`src/servicios-aplicacion/gestor-docker.ts`)
+ya persistian el fallo en la tabla de registro de despliegue antes de relanzarlo, pero tampoco
+llamaban al logger; y `src/index.ts` no tenia `process.on("uncaughtException"/"unhandledRejection")`,
+por lo que un error fuera del ciclo de peticion/respuesta de Express podia perderse sin pasar por
+Pino.
+
+**Decision:**
+1. Se agrego `logger.warn` a cada rama de `manejador-errores.ts` que aun no logueaba. Las ramas
+   que agrupan varias clases de error con `instanceof ... || instanceof ...` no se separaron;
+   se agrego una sola linea de log por rama con un campo `tipo: err.constructor.name` para no
+   perder granularidad sobre cual clase especifica ocurrio, evitando expandir el archivo con
+   ramas nuevas.
+2. Se agrego `logger.warn` dentro de los `catch` ya existentes de `GestorDocker`, junto a la
+   llamada a `this.registrar(...)` que ya persistia el fallo en BD, sin tocar esa persistencia
+   ni el `throw`.
+3. Se agregaron `process.on("uncaughtException")` y `process.on("unhandledRejection")` en
+   `src/index.ts` (archivo exento de TDD segun `CLAUDE.md` 7.2), que registran con
+   `logger.fatal` y terminan el proceso — el mismo desenlace que ya ocurria por defecto en Node,
+   solo que ahora queda capturado por Pino antes de salir.
+4. `src/servicios-aplicacion/verificador-recursos.ts` y `src/repositorios/*` no se modificaron:
+   no tienen `try/catch` propio, por lo que cualquier falla inesperada sube sin tocar hasta el
+   catch-all de `manejador-errores.ts`, que ya la registra. `src/api/middlewares/autorizar.ts`
+   tampoco se toco: su `logger.warn` de `acceso_no_autorizado` queda duplicado con el mismo
+   evento en `manejador-errores.ts`, pero es una duplicacion menor y no una ausencia de log, por
+   lo que se dejo fuera de alcance de este cambio.
+
+**Consecuencias:** Todo error que llega al middleware global de errores deja un registro en
+consola, sea de dominio (4xx, nivel `warn`) o interno/de proceso (5xx o fatal, nivel
+`error`/`fatal`). No se modifico ningun codigo de estado HTTP, mensaje al cliente, dato
+persistido ni excepcion relanzada: el cambio es puramente aditivo. No se agregaron pruebas
+nuevas que verifiquen llamadas al logger (decision explicita del desarrollador); las lineas
+agregadas quedan cubiertas por las pruebas existentes que ya ejercitan esas mismas ramas
+verificando el codigo de estado HTTP.
+
+**Alternativas consideradas:**
+- Separar cada rama agrupada de `manejador-errores.ts` en un `if` por clase de error, con un
+  `evento` distinto por clase. Descartada por aumentar innecesariamente el tamano del archivo
+  para una sesion que buscaba ser puramente aditiva; el campo `tipo` ya distingue la clase
+  exacta dentro de la rama agrupada.
+- Agregar pruebas unitarias que mockeen el logger y verifiquen cada llamada. Descartada por
+  decision explicita del desarrollador: esta sesion se limito a agregar logs, no a ampliar la
+  suite de pruebas.
+- Dejar que `process.on("unhandledRejection")` solo loguee sin terminar el proceso. Descartada
+  para no dejar el proceso en un estado inconsistente distinto al comportamiento por defecto de
+  Node ante una promesa rechazada sin manejar.

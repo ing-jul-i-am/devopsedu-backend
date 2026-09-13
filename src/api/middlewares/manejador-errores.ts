@@ -55,6 +55,11 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof UsuarioNoEncontradoError ||
     err instanceof EvaluacionNoEncontradaError
   ) {
+    logger.warn({
+      evento: "recurso_no_encontrado",
+      tipo: err.constructor.name,
+      ruta: req.path,
+    });
     res.status(404).json({ error: err.message });
     return;
   }
@@ -65,12 +70,23 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof IntentosAgotadosError ||
     err instanceof EvaluacionYaAprobadaError
   ) {
+    logger.warn({
+      evento: "conflicto_estado",
+      tipo: err.constructor.name,
+      ruta: req.path,
+    });
     res.status(409).json({ error: err.message });
     return;
   }
 
   if (err instanceof RecursosInsuficientesError) {
     // RF-09: se informa al usuario los valores solicitados y los disponibles.
+    logger.warn({
+      evento: "recursos_insuficientes",
+      ruta: req.path,
+      solicitado: err.solicitado,
+      disponible: err.disponible,
+    });
     res.status(422).json({
       error: err.message,
       solicitado: err.solicitado,
@@ -83,6 +99,11 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof ImagenDockerNoDisponibleError ||
     err instanceof EvaluacionNoDisponibleError
   ) {
+    logger.warn({
+      evento: "recurso_no_disponible",
+      tipo: err.constructor.name,
+      ruta: req.path,
+    });
     res.status(422).json({ error: err.message });
     return;
   }
@@ -91,16 +112,23 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
     err instanceof TransicionInvalidaError ||
     err instanceof NombreContenedorEnUsoError
   ) {
+    logger.warn({
+      evento: "transicion_rechazada",
+      tipo: err.constructor.name,
+      ruta: req.path,
+    });
     res.status(409).json({ error: err.message });
     return;
   }
 
   if (err instanceof RespuestasIncompletasError) {
+    logger.warn({ evento: "respuestas_incompletas", ruta: req.path });
     res.status(400).json({ error: err.message });
     return;
   }
 
   if (err instanceof ContenedorNoEncontradoError) {
+    logger.warn({ evento: "contenedor_no_encontrado", ruta: req.path });
     res.status(404).json({ error: err.message });
     return;
   }
@@ -121,6 +149,7 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
   }
 
   if (err instanceof ArchivoNoProporcionadoError) {
+    logger.warn({ evento: "archivo_no_proporcionado", ruta: req.path });
     res.status(400).json({ error: err.message });
     return;
   }

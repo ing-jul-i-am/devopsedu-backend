@@ -27,3 +27,14 @@ app.listen(configuracion.PORT, () => {
   // RF-16/RF-18/RNF-09: inicia la recoleccion periodica de metricas de los servicios activos.
   dependencias.monitor.iniciar();
 });
+
+// Garantiza que ningun error escape sin registro, incluso fuera del ciclo de peticion/respuesta.
+process.on("uncaughtException", (error) => {
+  logger.fatal({ evento: "excepcion_no_capturada", error });
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (razon) => {
+  logger.fatal({ evento: "promesa_rechazada_no_manejada", razon });
+  process.exit(1);
+});

@@ -98,6 +98,12 @@ export class GestorDocker {
       await this.evaluarActividades(idUsuario, idServicio, "desplegar");
       return actualizado;
     } catch (error) {
+      logger.warn({
+        evento: "despliegue_fallido",
+        idServicio,
+        idUsuario,
+        error: mensajeDe(error),
+      });
       await this.dep.servicioRepo.actualizarEstado(idServicio, "fallido");
       await this.registrar(
         idServicio,
@@ -126,6 +132,12 @@ export class GestorDocker {
       return actualizado;
     } catch (error) {
       // La detencion fallida conserva el estado actual (seccion 4.2.14) y deja registro.
+      logger.warn({
+        evento: "detencion_fallida",
+        idServicio,
+        idUsuario,
+        error: mensajeDe(error),
+      });
       await this.registrar(
         idServicio,
         idUsuario,
@@ -154,6 +166,12 @@ export class GestorDocker {
       await this.evaluarActividades(idUsuario, idServicio, "reiniciar");
       return actualizado;
     } catch (error) {
+      logger.warn({
+        evento: "reinicio_fallido",
+        idServicio,
+        idUsuario,
+        error: mensajeDe(error),
+      });
       await this.dep.servicioRepo.actualizarEstado(idServicio, "fallido");
       await this.registrar(
         idServicio,
@@ -176,6 +194,12 @@ export class GestorDocker {
     } catch (error) {
       // Si el contenedor nunca existio, la eliminacion logica del servicio continua igual.
       if (!(error instanceof ContenedorNoEncontradoError)) {
+        logger.warn({
+          evento: "eliminacion_fallida",
+          idServicio,
+          idUsuario,
+          error: mensajeDe(error),
+        });
         await this.registrar(
           idServicio,
           idUsuario,
@@ -185,6 +209,11 @@ export class GestorDocker {
         );
         throw error;
       }
+      logger.warn({
+        evento: "contenedor_ya_no_existia",
+        idServicio,
+        idUsuario,
+      });
     }
 
     // RF-14: el servicio deja de estar activo pero su informacion se preserva (marca eliminado).

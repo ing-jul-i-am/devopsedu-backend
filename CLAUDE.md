@@ -231,6 +231,7 @@ Todo endpoint que reciba un cuerpo, parámetros de ruta o query strings valida c
 - Pino con configuración pretty solo en desarrollo.
 - Eventos del RNF-14 (intentos fallidos, accesos no autorizados, operaciones administrativas) con nivel `warn` y campo `evento` estructurado.
 - En tests, el logger se silencia automáticamente para no contaminar la salida (configurado en `setup-global.ts`).
+- Todo error que llega al middleware global de errores (`manejador-errores.ts`) deja un registro: `warn` para errores de dominio (4xx) y `error`/`fatal` para fallos internos (5xx) o de proceso. Los manejadores `process.on("uncaughtException"|"unhandledRejection")` en `src/index.ts` garantizan que ningún error escape sin registro, incluso fuera del ciclo de petición/respuesta (DT-12).
 
 ### 6.7 Variables de entorno
 
