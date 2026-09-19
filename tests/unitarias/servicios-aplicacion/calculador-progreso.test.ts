@@ -1,106 +1,194 @@
 // tests/unitarias/servicios-aplicacion/calculador-progreso.test.ts
-// Cubre: RF-23, RF-24 — CU-12, CU-14
+// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14 (DT-14)
 
 import { describe, it, expect, vi } from "vitest";
-import { CalculadorProgreso } from "@/servicios-aplicacion/calculador-progreso.js";
+import {
+  CalculadorProgreso,
+  type DependenciasCalculadorProgreso,
+} from "@/servicios-aplicacion/calculador-progreso.js";
+import type { RutaAprendizajeConModulos } from "@/repositorios/ruta-aprendizaje-repo.js";
 import { UMBRAL_APROBACION_EVALUACION } from "@/dominio/reglas-evaluacion.js";
+
+const INICIADO = new Date("2026-01-01");
 
 function crearDependenciasMock() {
   return {
     rutaRepo: { actualizarProgreso: vi.fn() },
-    actividadRepo: { listarPorModulo: vi.fn() },
-    evaluacionRepo: { buscarPorModulo: vi.fn() },
+    actividadRepo: { listarPorModulo: vi.fn().mockResolvedValue([]) },
+    evaluacionRepo: { buscarPorModulo: vi.fn().mockResolvedValue(null) },
     resultadoRepo: {
       contarActividadesCompletadasEnRuta: vi.fn(),
-      contarEvaluacionesAprobadasEnRuta: vi.fn(),
+      existeAprobadaPorUsuarioYEvaluacion: vi.fn(),
     },
   };
 }
 
-function rutaConModulos(idModulos: number[]) {
-  return {
+function crearCalculador(dep: ReturnType<typeof crearDependenciasMock>) {
+  return new CalculadorProgreso(dep as unknown as DependenciasCalculadorProgreso);
+}
+
+function rutaConModulos(
+  modulos: Array<{ idModulo: number; fechaInicio: Date | null }>,
+  progreso = 0
+): RutaAprendizajeConModulos {
+  const ruta = {
     idRuta: 10,
     idUsuario: 1,
-    rutaModulos: idModulos.map((idModulo, indice) => ({
+    progreso,
+    rutaModulos: modulos.map(({ idModulo, fechaInicio }, indice) => ({
       idRuta: 10,
       idModulo,
       ordenSecuencia: indice + 1,
-      fechaInicio: null,
+      fechaInicio,
     })),
   };
+  return ruta as unknown as RutaAprendizajeConModulos;
 }
 
 describe("CalculadorProgreso.recalcular", () => {
-  it("calcula el progreso solo con actividades cuando ningun modulo tiene evaluacion", async () => {
+  it("cuenta como completados los modulos de solo lectura ya iniciados", async () => {
     // Arrange
     const dep = crearDependenciasMock();
-    const ruta = rutaConModulos([1]);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([
-      { idActividad: 100 },
-      { idActividad: 101 },
+    const ruta = rutaConModulos([
+      { idModulo: 1, fechaInicio: INICIADO },
+      { idModulo: 2, fechaInicio: INICIADO },
+      { idModulo: 3, fechaInicio: INICIADO },
     ]);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.resultadoRepo.contarEvaluacionesAprobadasEnRuta.mockResolvedValue(0);
-    const calculador = new CalculadorProgreso(dep as any);
+    const calculador = crearCalculador(dep);
 
     // Act
-    await calculador.recalcular(1, ruta as any);
+    await calculador.recalcular(1, ruta);
+
+    // Assert
+    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 100);
+    expect(dep.resultadoRepo.contarActividadesCompletadasEnRuta).not.toHaveBeenCalled();
+    expect(dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion).not.toHaveBeenCalled();
+  });
+
+  it("no cuenta un modulo de solo lectura que aun no se ha iniciado", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    const ruta = rutaConModulos(
+      [
+        { idModulo: 1, fechaInicio: INICIADO },
+        { idModulo: 2, fechaInicio: null },
+      ],
+      100
+    );
+    const calculador = crearCalculador(dep);
+
+    // Act
+    await calculador.recalcular(1, ruta);
+
+    // Assert
+    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 50);
+  });
+
+  it("no cuenta un modulo con actividades pendientes aunque este iniciado", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    const ruta = rutaConModulos([
+      { idModulo: 1, fechaInicio: INICIADO },
+      { idModulo: 2, fechaInicio: INICIADO },
+    ]);
+    dep.actividadRepo.listarPorModulo.mockImplementation((idModulo: number) =>
+      Promise.resolve(
+        idModulo === 2 ? [{ idActividad: 100 }, { idActividad: 101 }] : []
+      )
+    );
+    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
+    const calculador = crearCalculador(dep);
+
+    // Act
+    await calculador.recalcular(1, ruta);
 
     // Assert
     expect(dep.resultadoRepo.contarActividadesCompletadasEnRuta).toHaveBeenCalledWith(
       1,
       [100, 101]
     );
-    expect(dep.resultadoRepo.contarEvaluacionesAprobadasEnRuta).toHaveBeenCalledWith(
+    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 50);
+  });
+
+  it("cuenta un modulo con evaluacion solo cuando esta fue aprobada", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    const ruta = rutaConModulos([
+      { idModulo: 1, fechaInicio: INICIADO },
+      { idModulo: 2, fechaInicio: INICIADO },
+    ]);
+    dep.evaluacionRepo.buscarPorModulo.mockImplementation((idModulo: number) =>
+      Promise.resolve({ idEvaluacion: 200 + idModulo })
+    );
+    dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion.mockImplementation(
+      (_idUsuario: number, idEvaluacion: number) =>
+        Promise.resolve(idEvaluacion === 201)
+    );
+    const calculador = crearCalculador(dep);
+
+    // Act
+    await calculador.recalcular(1, ruta);
+
+    // Assert
+    expect(dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion).toHaveBeenCalledWith(
       1,
-      [],
+      201,
       UMBRAL_APROBACION_EVALUACION
     );
     expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 50);
   });
 
-  it("combina actividades completadas y evaluaciones aprobadas en el total", async () => {
+  it("no escribe en la base de datos cuando el progreso no cambio", async () => {
     // Arrange
     const dep = crearDependenciasMock();
-    const ruta = rutaConModulos([1, 2]);
-    dep.actividadRepo.listarPorModulo.mockImplementation((idModulo: number) =>
-      Promise.resolve(idModulo === 1 ? [{ idActividad: 100 }] : [])
-    );
-    dep.evaluacionRepo.buscarPorModulo.mockImplementation((idModulo: number) =>
-      Promise.resolve(idModulo === 2 ? { idEvaluacion: 200 } : null)
-    );
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.resultadoRepo.contarEvaluacionesAprobadasEnRuta.mockResolvedValue(1);
-    const calculador = new CalculadorProgreso(dep as any);
+    const ruta = rutaConModulos([{ idModulo: 1, fechaInicio: INICIADO }], 100);
+    const calculador = crearCalculador(dep);
 
     // Act
-    await calculador.recalcular(1, ruta as any);
+    await calculador.recalcular(1, ruta);
 
     // Assert
-    expect(dep.resultadoRepo.contarEvaluacionesAprobadasEnRuta).toHaveBeenCalledWith(
-      1,
-      [200],
-      UMBRAL_APROBACION_EVALUACION
+    expect(dep.rutaRepo.actualizarProgreso).not.toHaveBeenCalled();
+  });
+});
+
+describe("CalculadorProgreso.recalcularConEstados", () => {
+  it("devuelve el estado de cada modulo en orden junto al progreso derivado", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    const ruta = rutaConModulos([
+      { idModulo: 1, fechaInicio: INICIADO },
+      { idModulo: 2, fechaInicio: INICIADO },
+      { idModulo: 3, fechaInicio: null },
+    ]);
+    dep.actividadRepo.listarPorModulo.mockImplementation((idModulo: number) =>
+      Promise.resolve(idModulo === 2 ? [{ idActividad: 100 }] : [])
     );
-    // (1 actividad completada + 1 evaluacion aprobada) / (1 actividad + 1 evaluacion) * 100
-    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 100);
+    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(0);
+    const calculador = crearCalculador(dep);
+
+    // Act
+    const resultado = await calculador.recalcularConEstados(1, ruta);
+
+    // Assert
+    expect(resultado).toEqual({
+      estados: ["completado", "en_progreso", "sin_iniciar"],
+      progreso: 33.33,
+    });
+    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 33.33);
   });
 
-  it("deja el progreso en 0 sin dividir por cero cuando la ruta no tiene actividades ni evaluaciones", async () => {
+  it("devuelve progreso 0 sin estados cuando la ruta no tiene modulos", async () => {
     // Arrange
     const dep = crearDependenciasMock();
-    const ruta = rutaConModulos([1]);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([]);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
-    const calculador = new CalculadorProgreso(dep as any);
+    const ruta = rutaConModulos([]);
+    const calculador = crearCalculador(dep);
 
     // Act
-    await calculador.recalcular(1, ruta as any);
+    const resultado = await calculador.recalcularConEstados(1, ruta);
 
     // Assert
-    expect(dep.rutaRepo.actualizarProgreso).toHaveBeenCalledWith(10, 0);
-    expect(dep.resultadoRepo.contarActividadesCompletadasEnRuta).not.toHaveBeenCalled();
-    expect(dep.resultadoRepo.contarEvaluacionesAprobadasEnRuta).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ estados: [], progreso: 0 });
+    expect(dep.rutaRepo.actualizarProgreso).not.toHaveBeenCalled();
   });
 });

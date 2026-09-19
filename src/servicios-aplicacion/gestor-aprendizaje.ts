@@ -1,6 +1,6 @@
 // src/servicios-aplicacion/gestor-aprendizaje.ts
 // Servicio de aplicacion para las acciones del estudiante sobre su propia ruta de aprendizaje.
-// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
+// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14 (DT-14)
 
 import type { Evaluacion, RutaAprendizaje, RutaModulo, Modulo, Actividad } from "@prisma/client";
 import type {
@@ -13,7 +13,6 @@ import type { ActividadRepo } from "../repositorios/actividad-repo.js";
 import type { CalculadorProgreso } from "./calculador-progreso.js";
 import type { PreguntaEvaluacion } from "../dominio/modelos/pregunta-evaluacion.js";
 import type { EstadoModulo } from "../dominio/estado-modulo.js";
-import { calcularEstadoModulo } from "../dominio/estado-modulo.js";
 import { ModuloNoAsignadoError } from "../dominio/errores/modulo-no-asignado-error.js";
 import { EvaluacionNoEncontradaError } from "../dominio/errores/evaluacion-no-encontrada-error.js";
 import { EvaluacionNoDisponibleError } from "../dominio/errores/evaluacion-no-disponible-error.js";
@@ -36,9 +35,8 @@ export interface DependenciasGestorAprendizaje {
     | "crearParaEvaluacion"
     | "contarIntentosPorUsuarioYEvaluacion"
     | "existeAprobadaPorUsuarioYEvaluacion"
-    | "contarActividadesCompletadasEnRuta"
   >;
-  calculadorProgreso: Pick<CalculadorProgreso, "recalcular">;
+  calculadorProgreso: Pick<CalculadorProgreso, "recalcular" | "recalcularConEstados">;
   actividadRepo: Pick<ActividadRepo, "listarPorModulo">;
 }
 
@@ -53,7 +51,9 @@ export type RutaModuloConEstado = RutaModulo & {
   estado: EstadoModulo;
 };
 
-export type RutaAprendizajeConEstadoDeModulos = RutaAprendizaje & {
+// progreso es number (derivado por CalculadorProgreso), no el Decimal persistido por Prisma.
+export type RutaAprendizajeConEstadoDeModulos = Omit<RutaAprendizaje, "progreso"> & {
+  progreso: number;
   rutaModulos: RutaModuloConEstado[];
 };
 
@@ -67,9 +67,8 @@ export interface RetroalimentacionEvaluacion {
 export class GestorAprendizaje {
   constructor(private readonly dep: DependenciasGestorAprendizaje) {}
 
-  // RF-22: adjunta a cada modulo de la ruta su estado de progreso (ver
-  // src/dominio/estado-modulo.ts y DT-13). Loop secuencial, consistente con el estilo de
-  // CalculadorProgreso.recalcular y EvaluadorActividad.buscarActividadEnCurso.
+  // RF-22: adjunta a cada modulo de la ruta su estado de progreso (DT-13) y devuelve el progreso
+  // recien derivado de esos estados, que CalculadorProgreso persiste si estaba desfasado (DT-14).
   async obtenerMiRuta(
     idUsuario: number
   ): Promise<RutaAprendizajeConEstadoDeModulos | null> {
@@ -78,56 +77,30 @@ export class GestorAprendizaje {
       return null;
     }
 
-    const rutaModulos: RutaModuloConEstado[] = [];
-    for (const rutaModulo of ruta.rutaModulos) {
-      const estado = await this.calcularEstadoDeModulo(idUsuario, rutaModulo);
-      rutaModulos.push({ ...rutaModulo, estado });
-    }
-
-    return { ...ruta, rutaModulos };
-  }
-
-  private async calcularEstadoDeModulo(
-    idUsuario: number,
-    rutaModulo: RutaModulo
-  ): Promise<EstadoModulo> {
-    const actividades = await this.dep.actividadRepo.listarPorModulo(
-      rutaModulo.idModulo
+    const { estados, progreso } =
+      await this.dep.calculadorProgreso.recalcularConEstados(idUsuario, ruta);
+    const rutaModulos: RutaModuloConEstado[] = ruta.rutaModulos.map(
+      (rutaModulo, indice) => ({
+        ...rutaModulo,
+        estado: estados[indice] ?? "sin_iniciar",
+      })
     );
-    const idsActividad = actividades.map((actividad) => actividad.idActividad);
-    const actividadesCompletadas =
-      idsActividad.length > 0
-        ? await this.dep.resultadoRepo.contarActividadesCompletadasEnRuta(
-            idUsuario,
-            idsActividad
-          )
-        : 0;
 
-    const evaluacion = await this.dep.evaluacionRepo.buscarPorModulo(
-      rutaModulo.idModulo
-    );
-    const evaluacionAprobada = evaluacion
-      ? await this.dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion(
-          idUsuario,
-          evaluacion.idEvaluacion,
-          UMBRAL_APROBACION_EVALUACION
-        )
-      : false;
-
-    return calcularEstadoModulo({
-      totalActividadesReferenciadas: idsActividad.length,
-      actividadesCompletadas,
-      tieneEvaluacion: evaluacion !== null,
-      evaluacionAprobada,
-      fechaInicio: rutaModulo.fechaInicio,
-    });
+    return { ...ruta, progreso, rutaModulos };
   }
 
   // RF-23: marca cuando el estudiante llega al modulo, para calcular el tiempo empleado en sus
   // actividades. Idempotente: repetir la llamada no reinicia el conteo (ver RutaAprendizajeRepo.marcarInicioModulo).
+  // DT-14: iniciar completa de inmediato un modulo de solo lectura, por eso recalcula el progreso.
+  // Se vuelve a consultar la ruta porque la leida antes aun trae fechaInicio en null.
   async iniciarModulo(idUsuario: number, idModulo: number): Promise<void> {
     const { ruta } = await this.buscarRutaModulo(idUsuario, idModulo);
     await this.dep.rutaRepo.marcarInicioModulo(ruta.idRuta, idModulo);
+
+    const rutaActualizada = await this.dep.rutaRepo.buscarUltimaPorUsuario(idUsuario);
+    if (rutaActualizada) {
+      await this.dep.calculadorProgreso.recalcular(idUsuario, rutaActualizada);
+    }
   }
 
   // RF-23: devuelve el contenido de un modulo asignado a la ruta activa del estudiante, junto
@@ -157,7 +130,7 @@ export class GestorAprendizaje {
   }
 
   // RF-24: califica la evaluacion, aplica el limite de intentos y el bloqueo tras aprobar, y
-  // recalcula el progreso combinado (CalculadorProgreso) solo cuando el intento aprueba.
+  // recalcula el progreso de la ruta (CalculadorProgreso) solo cuando el intento aprueba.
   async responderEvaluacion(
     idUsuario: number,
     idModulo: number,

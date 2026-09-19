@@ -1,6 +1,6 @@
 // tests/integracion/api/aprendizaje/mi-ruta.test.ts
 // Pruebas de integracion para GET /api/aprendizaje/mi-ruta.
-// Cubre: RF-22 — CU-13
+// Cubre: RF-22 — CU-13 (DT-14)
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import request from "supertest";
@@ -255,6 +255,75 @@ describe("GET /api/aprendizaje/mi-ruta", () => {
       { idModulo: moduloCompletado.idModulo, nombre: "Modulo completado", ordenSecuencia: 1, estado: "completado" },
       { idModulo: moduloSinIniciar.idModulo, nombre: "Modulo sin iniciar", ordenSecuencia: 2, estado: "sin_iniciar" },
     ]);
+  });
+
+  it("devuelve y persiste progreso 100 cuando todos los modulos de solo lectura fueron iniciados", async () => {
+    // Arrange
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const token = await obtenerToken(ESTUDIANTE);
+    const estudiante = await prismaTest.usuario.findUniqueOrThrow({
+      where: { correo: ESTUDIANTE.correo },
+    });
+    const modulos = [
+      await crearModuloEnBd({ nombre: "Lectura 1" }),
+      await crearModuloEnBd({ nombre: "Lectura 2" }),
+      await crearModuloEnBd({ nombre: "Lectura 3" }),
+    ];
+    const ruta = await prismaTest.rutaAprendizaje.create({
+      data: {
+        idUsuario: estudiante.idUsuario,
+        rutaModulos: {
+          create: modulos.map((modulo, indice) => ({
+            idModulo: modulo.idModulo,
+            ordenSecuencia: indice + 1,
+            fechaInicio: new Date("2026-01-01"),
+          })),
+        },
+      },
+    });
+
+    // Act
+    const respuesta = await request(app)
+      .get("/api/aprendizaje/mi-ruta")
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    expect(respuesta.body.progreso).toBe(100);
+    const rutaPersistida = await prismaTest.rutaAprendizaje.findUniqueOrThrow({
+      where: { idRuta: ruta.idRuta },
+    });
+    expect(Number(rutaPersistida.progreso)).toBe(100);
+  });
+
+  it("no suma al progreso los modulos con actividades pendientes", async () => {
+    // Arrange
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const token = await obtenerToken(ESTUDIANTE);
+    const estudiante = await prismaTest.usuario.findUniqueOrThrow({
+      where: { correo: ESTUDIANTE.correo },
+    });
+    const moduloLectura = await crearModuloEnBd({ nombre: "Lectura" });
+    const moduloPractico = await crearModuloEnBd({ nombre: "Practica" });
+    await crearActividadEnBd({ idModulo: moduloPractico.idModulo });
+    await prismaTest.rutaAprendizaje.create({
+      data: {
+        idUsuario: estudiante.idUsuario,
+        rutaModulos: {
+          create: [
+            { idModulo: moduloLectura.idModulo, ordenSecuencia: 1, fechaInicio: new Date("2026-01-01") },
+            { idModulo: moduloPractico.idModulo, ordenSecuencia: 2, fechaInicio: new Date("2026-01-01") },
+          ],
+        },
+      },
+    });
+
+    // Act
+    const respuesta = await request(app)
+      .get("/api/aprendizaje/mi-ruta")
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    expect(respuesta.body.progreso).toBe(50);
   });
 
   it("rechaza con 403 cuando el usuario es docente", async () => {

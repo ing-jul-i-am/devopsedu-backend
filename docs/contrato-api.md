@@ -35,6 +35,10 @@ base de datos y resincroniza automaticamente (ver 3.6):
   evaluaciones aprobadas (`CalculadorProgreso`).
 - RF-22, DT-13: `GET /api/aprendizaje/mi-ruta` agrega `estado` a cada modulo
   de `modulos[]` (`"completado" | "en_progreso" | "sin_iniciar"`). Ver 6.1.
+- RF-22, DT-14: `RutaAprendizaje.progreso` pasa a ser el porcentaje de modulos
+  completados (incluye los modulos de solo lectura, que antes dejaban la ruta
+  en 0). Se recalcula tambien al iniciar un modulo (6.2) y en cada consulta de
+  `mi-ruta` (6.1). La forma de las respuestas no cambia.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -759,11 +763,14 @@ autenticacion y estan restringidas al rol `estudiante`; un docente recibe `403`.
 
 Devuelve la ruta de aprendizaje mas reciente asignada al estudiante autenticado
 (ver 5.1), con sus modulos en el orden de la secuencia y el nombre de cada uno.
-`progreso` es el campo persistido en `RutaAprendizaje`, recalculado por
-`CalculadorProgreso` cada vez que se completa una actividad (RF-23) o se
-aprueba una evaluacion (RF-24, ver DT-11):
-`(actividades completadas + evaluaciones aprobadas) / (total de actividades +
-total de evaluaciones de la ruta) * 100`.
+`progreso` es el porcentaje de modulos de la ruta cuyo `estado` es
+`"completado"` (ver DT-14): `modulos completados / total de modulos * 100`,
+redondeado a dos decimales. Un modulo de solo lectura (sin actividades ni
+evaluacion) cuenta como completado en cuanto se inicia. `CalculadorProgreso` lo
+recalcula y persiste en `RutaAprendizaje` al iniciar un modulo (6.2), al
+completarse una actividad (RF-23), al aprobarse una evaluacion (RF-24) y en
+cada llamada a este endpoint (solo escribe si el valor cambio), por lo que
+siempre coincide con los `estado` devueltos.
 
 Cada modulo trae ademas `estado`: `"sin_iniciar"` si `fechaInicio` es null;
 si el modulo ya fue iniciado, `"completado"` cuando todas sus actividades
@@ -827,6 +834,8 @@ modulo.
 Marca que el estudiante llego al modulo indicado, para que `EvaluadorActividad`
 pueda calcular `tiempoEmpleado` de sus actividades (RF-23, ver DT-10). Es
 idempotente: llamarlo varias veces no reinicia la fecha ya registrada.
+Ademas recalcula `RutaAprendizaje.progreso`: un modulo de solo lectura queda
+completado al iniciarse, asi que el porcentaje sube en ese momento (DT-14).
 
 **Response `200 OK`**
 

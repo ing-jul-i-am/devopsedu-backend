@@ -1,6 +1,6 @@
 // tests/integracion/api/aprendizaje/iniciar-modulo.test.ts
 // Pruebas de integracion para POST /api/aprendizaje/modulos/:idModulo/iniciar.
-// Cubre: RF-23 — CU-12
+// Cubre: RF-22, RF-23 — CU-13, CU-12 (DT-14)
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import request from "supertest";
@@ -72,6 +72,39 @@ describe("POST /api/aprendizaje/modulos/:idModulo/iniciar", () => {
       where: { idModulo: modulo.idModulo },
     });
     expect(rutaModulo?.fechaInicio).not.toBeNull();
+  });
+
+  it("recalcula el progreso de la ruta al completar un modulo de solo lectura", async () => {
+    // Arrange
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const token = await obtenerToken(ESTUDIANTE);
+    const estudiante = await prismaTest.usuario.findUniqueOrThrow({
+      where: { correo: ESTUDIANTE.correo },
+    });
+    const lecturaA = await crearModuloEnBd({ nombre: "Lectura A" });
+    const lecturaB = await crearModuloEnBd({ nombre: "Lectura B" });
+    const ruta = await prismaTest.rutaAprendizaje.create({
+      data: {
+        idUsuario: estudiante.idUsuario,
+        rutaModulos: {
+          create: [
+            { idModulo: lecturaA.idModulo, ordenSecuencia: 1 },
+            { idModulo: lecturaB.idModulo, ordenSecuencia: 2 },
+          ],
+        },
+      },
+    });
+
+    // Act
+    await request(app)
+      .post(`/api/aprendizaje/modulos/${lecturaA.idModulo}/iniciar`)
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    const rutaPersistida = await prismaTest.rutaAprendizaje.findUniqueOrThrow({
+      where: { idRuta: ruta.idRuta },
+    });
+    expect(Number(rutaPersistida.progreso)).toBe(50);
   });
 
   it("es idempotente: no reinicia la fecha si ya se habia marcado", async () => {

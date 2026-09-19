@@ -562,3 +562,49 @@ cambia su codigo de estado ni su estructura general, solo agrega el campo `estad
   verdad de "actividades referenciadas", en vez de `actividadRepo.listarPorModulo`. Descartada
   para no introducir una segunda fuente de verdad que podria desincronizarse de la tabla
   `Actividad` (el invariante de DT-10 ya asume que coinciden).
+
+## DT-14: progreso de la ruta medido en modulos completados (RF-22, RF-23, RF-24)
+
+**Fecha:** 2026-09-19
+
+**Contexto:** Una ruta formada solo por modulos de lectura (sin `Actividad` ni `Evaluacion`)
+mostraba todos sus modulos en `"completado"` (DT-13) pero `progreso: 0`. La formula de DT-11
+usaba como denominador `total de actividades + total de evaluaciones` de la ruta; en una ruta
+de solo lectura ese total es `0` y `CalculadorProgreso` persistia `0`. Ademas, el unico momento
+en que un modulo de lectura pasa a `"completado"` es al iniciarse
+(`POST /api/aprendizaje/modulos/:idModulo/iniciar`), y ese flujo no recalculaba el progreso.
+Las decisiones se acordaron con el desarrollador antes de iniciar TDD.
+
+**Decision:**
+1. **Nueva formula.** `progreso = modulos con estado "completado" / total de modulos * 100`,
+   redondeado a dos decimales. "Completado" es exactamente el resultado de
+   `calcularEstadoModulo` (DT-13), asi que el porcentaje siempre coincide con los estados que ve
+   el estudiante. La regla pura vive en `src/dominio/progreso-ruta.ts`
+   (`calcularProgresoRuta`); una ruta sin modulos da `0`.
+2. **Una sola fuente de verdad.** El calculo de estado por modulo, que era un metodo privado de
+   `GestorAprendizaje`, se movio a `CalculadorProgreso`. Su nuevo metodo
+   `recalcularConEstados` devuelve los estados de cada modulo y el progreso derivado, y persiste
+   el progreso solo si cambio. `recalcular` se conserva como envoltura, por lo que
+   `EvaluadorActividad` y `GestorAprendizaje.responderEvaluacion` no cambiaron.
+3. **Puntos de recalculo.** Actividad completada (RF-23), evaluacion aprobada (RF-24), inicio de
+   modulo (nuevo; `GestorAprendizaje.iniciarModulo` vuelve a consultar la ruta tras marcar
+   `fechaInicio`, porque la leida antes aun trae `null`) y consulta de
+   `GET /api/aprendizaje/mi-ruta`, que obtiene estados y progreso en una sola pasada.
+4. **`ResultadoRepo.contarEvaluacionesAprobadasEnRuta` se elimino** junto con sus pruebas: quedo
+   sin consumidores, porque el estado de la evaluacion ahora se consulta por modulo con
+   `existeAprobadaPorUsuarioYEvaluacion`.
+
+**Consecuencias:** Completar parte de las actividades de un modulo ya no mueve el porcentaje;
+solo cuenta el modulo cuando esta completo. Todos los modulos pesan lo mismo, sin importar
+cuantas actividades o evaluaciones tengan. `GET /mi-ruta` puede escribir en la base de datos
+(solo cuando el valor guardado estaba desfasado), lo que corrige en la primera consulta las
+rutas guardadas con la formula anterior y deja un valor consistente para los reportes de la
+Etapa 7 (RF-25/26). La forma de las respuestas HTTP no cambia.
+
+**Alternativas consideradas:**
+- Mantener la formula por items y contar cada modulo de solo lectura como un item. Conservaba la
+  granularidad fina, pero daba mas peso a los modulos con muchas actividades y el porcentaje no
+  coincidia con los estados por modulo. Descartada por el desarrollador.
+- Derivar el progreso en `GET /mi-ruta` sin persistirlo, o recalcular solo en las escrituras.
+  Descartadas: la primera deja desfasado el valor que usaran los reportes, y la segunda muestra
+  un porcentaje que no coincide con los estados hasta la siguiente accion del estudiante.

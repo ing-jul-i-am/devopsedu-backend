@@ -1,5 +1,5 @@
 // tests/unitarias/servicios-aplicacion/gestor-aprendizaje.test.ts
-// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
+// Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14 (DT-14)
 
 import { describe, it, expect, vi } from "vitest";
 import { GestorAprendizaje } from "@/servicios-aplicacion/gestor-aprendizaje.js";
@@ -22,9 +22,11 @@ function crearDependenciasMock() {
       crearParaEvaluacion: vi.fn(),
       contarIntentosPorUsuarioYEvaluacion: vi.fn(),
       existeAprobadaPorUsuarioYEvaluacion: vi.fn(),
-      contarActividadesCompletadasEnRuta: vi.fn(),
     },
-    calculadorProgreso: { recalcular: vi.fn() },
+    calculadorProgreso: {
+      recalcular: vi.fn(),
+      recalcularConEstados: vi.fn(),
+    },
     actividadRepo: { listarPorModulo: vi.fn() },
   };
 }
@@ -56,6 +58,21 @@ function moduloDePrueba(parciales: Record<string, unknown> = {}) {
   };
 }
 
+function rutaConModulos(idModulos: number[]) {
+  return {
+    idRuta: 1,
+    idUsuario: 5,
+    progreso: 0,
+    rutaModulos: idModulos.map((idModulo, indice) => ({
+      idRuta: 1,
+      idModulo,
+      ordenSecuencia: indice + 1,
+      fechaInicio: null,
+      modulo: moduloDePrueba({ idModulo }),
+    })),
+  };
+}
+
 function evaluacion(parciales: Record<string, unknown> = {}) {
   return {
     idEvaluacion: 200,
@@ -68,21 +85,6 @@ function evaluacion(parciales: Record<string, unknown> = {}) {
 }
 
 describe("GestorAprendizaje.obtenerMiRuta", () => {
-  it("delega la busqueda en el repositorio y devuelve la ruta encontrada", async () => {
-    // Arrange
-    const dep = crearDependenciasMock();
-    const ruta = { idRuta: 1, idUsuario: 5, progreso: 0, rutaModulos: [] };
-    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    const gestor = crearGestor(dep);
-
-    // Act
-    const resultado = await gestor.obtenerMiRuta(5);
-
-    // Assert
-    expect(dep.rutaRepo.buscarUltimaPorUsuario).toHaveBeenCalledWith(5);
-    expect(resultado).toEqual({ ...ruta, rutaModulos: [] });
-  });
-
   it("devuelve null cuando el estudiante no tiene ninguna ruta asignada", async () => {
     // Arrange
     const dep = crearDependenciasMock();
@@ -94,101 +96,46 @@ describe("GestorAprendizaje.obtenerMiRuta", () => {
 
     // Assert
     expect(resultado).toBeNull();
+    expect(dep.calculadorProgreso.recalcularConEstados).not.toHaveBeenCalled();
   });
 
-  it("marca el modulo como completado cuando esta iniciado, sus actividades estan completas y no tiene evaluacion", async () => {
+  it("adjunta a cada modulo el estado calculado por CalculadorProgreso", async () => {
     // Arrange
     const dep = crearDependenciasMock();
-    const ruta = rutaConModulo(7, new Date("2026-01-01"), moduloDePrueba());
+    const ruta = rutaConModulos([7, 8]);
     dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([{ idActividad: 1 }]);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
+    dep.calculadorProgreso.recalcularConEstados.mockResolvedValue({
+      estados: ["completado", "sin_iniciar"],
+      progreso: 50,
+    });
     const gestor = crearGestor(dep);
 
     // Act
     const resultado = await gestor.obtenerMiRuta(5);
 
     // Assert
-    expect(resultado?.rutaModulos[0]?.estado).toBe("completado");
+    expect(dep.calculadorProgreso.recalcularConEstados).toHaveBeenCalledWith(5, ruta);
+    expect(resultado?.rutaModulos.map((rm) => rm.estado)).toEqual([
+      "completado",
+      "sin_iniciar",
+    ]);
   });
 
-  it("marca el modulo como completado cuando esta iniciado, sus actividades estan completas y la evaluacion fue aprobada", async () => {
+  it("devuelve el progreso recalculado en lugar del valor guardado", async () => {
     // Arrange
     const dep = crearDependenciasMock();
-    const ruta = rutaConModulo(7, new Date("2026-01-01"), moduloDePrueba());
-    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([{ idActividad: 1 }]);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(evaluacion());
-    dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion.mockResolvedValue(true);
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(rutaConModulos([7, 8, 9]));
+    dep.calculadorProgreso.recalcularConEstados.mockResolvedValue({
+      estados: ["completado", "completado", "completado"],
+      progreso: 100,
+    });
     const gestor = crearGestor(dep);
 
     // Act
     const resultado = await gestor.obtenerMiRuta(5);
 
     // Assert
-    expect(resultado?.rutaModulos[0]?.estado).toBe("completado");
-  });
-
-  it("marca el modulo como en_progreso cuando esta iniciado pero la evaluacion no fue aprobada", async () => {
-    // Arrange
-    const dep = crearDependenciasMock();
-    const ruta = rutaConModulo(7, new Date("2026-01-01"), moduloDePrueba());
-    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([{ idActividad: 1 }]);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(evaluacion());
-    dep.resultadoRepo.existeAprobadaPorUsuarioYEvaluacion.mockResolvedValue(false);
-    const gestor = crearGestor(dep);
-
-    // Act
-    const resultado = await gestor.obtenerMiRuta(5);
-
-    // Assert
-    expect(resultado?.rutaModulos[0]?.estado).toBe("en_progreso");
-  });
-
-  it("marca el modulo como sin_iniciar cuando fechaInicio es null, sin importar las actividades", async () => {
-    // Arrange
-    const dep = crearDependenciasMock();
-    const ruta = rutaConModulo(7, null, moduloDePrueba());
-    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([{ idActividad: 1 }]);
-    dep.resultadoRepo.contarActividadesCompletadasEnRuta.mockResolvedValue(1);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
-    const gestor = crearGestor(dep);
-
-    // Act
-    const resultado = await gestor.obtenerMiRuta(5);
-
-    // Assert
-    expect(resultado?.rutaModulos[0]?.estado).toBe("sin_iniciar");
-  });
-
-  it("calcula el estado de cada modulo de la ruta de forma independiente", async () => {
-    // Arrange
-    const dep = crearDependenciasMock();
-    const ruta = {
-      idRuta: 1,
-      idUsuario: 5,
-      progreso: 0,
-      rutaModulos: [
-        { idRuta: 1, idModulo: 7, ordenSecuencia: 1, fechaInicio: new Date("2026-01-01"), modulo: moduloDePrueba({ idModulo: 7 }) },
-        { idRuta: 1, idModulo: 8, ordenSecuencia: 2, fechaInicio: null, modulo: moduloDePrueba({ idModulo: 8 }) },
-      ],
-    };
-    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(ruta);
-    dep.actividadRepo.listarPorModulo.mockResolvedValue([]);
-    dep.evaluacionRepo.buscarPorModulo.mockResolvedValue(null);
-    const gestor = crearGestor(dep);
-
-    // Act
-    const resultado = await gestor.obtenerMiRuta(5);
-
-    // Assert
-    expect(resultado?.rutaModulos[0]?.estado).toBe("completado");
-    expect(resultado?.rutaModulos[1]?.estado).toBe("sin_iniciar");
+    expect(resultado?.progreso).toBe(100);
   });
 });
 
@@ -204,6 +151,23 @@ describe("GestorAprendizaje.iniciarModulo", () => {
 
     // Assert
     expect(dep.rutaRepo.marcarInicioModulo).toHaveBeenCalledWith(1, 7);
+  });
+
+  it("recalcula el progreso con la ruta vuelta a consultar tras marcar el inicio", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    const rutaAntes = rutaConModulo(7, null);
+    const rutaDespues = rutaConModulo(7, new Date("2026-01-01"));
+    dep.rutaRepo.buscarUltimaPorUsuario
+      .mockResolvedValueOnce(rutaAntes)
+      .mockResolvedValueOnce(rutaDespues);
+    const gestor = crearGestor(dep);
+
+    // Act
+    await gestor.iniciarModulo(5, 7);
+
+    // Assert
+    expect(dep.calculadorProgreso.recalcular).toHaveBeenCalledWith(5, rutaDespues);
   });
 
   it("lanza ModuloNoAsignadoError cuando el estudiante no tiene ninguna ruta asignada", async () => {

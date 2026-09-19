@@ -925,7 +925,7 @@
                 "mi-ruta"
               ]
             },
-            "description": "RF-22 / CU-13: ruta de aprendizaje mas reciente asignada al estudiante autenticado, con sus modulos ordenados y el progreso (actualizado por EvaluadorActividad al completar actividades, ver RF-23 / DT-10). Cada modulo trae ademas 'estado' ('completado' | 'en_progreso' | 'sin_iniciar'), calculado a partir de fechaInicio, las actividades completadas y la aprobacion de la evaluacion del modulo (ver DT-13). Devuelve null si aun no se le asigno ninguna ruta. Exclusivo del rol estudiante."
+            "description": "RF-22 / CU-13: ruta de aprendizaje mas reciente asignada al estudiante autenticado, con sus modulos ordenados y el progreso: porcentaje de modulos en estado 'completado', incluidos los de solo lectura. Se recalcula en cada consulta y al iniciar un modulo, completar una actividad o aprobar una evaluacion (ver DT-14). Cada modulo trae ademas 'estado' ('completado' | 'en_progreso' | 'sin_iniciar'), calculado a partir de fechaInicio, las actividades completadas y la aprobacion de la evaluacion del modulo (ver DT-13). Devuelve null si aun no se le asigno ninguna ruta. Exclusivo del rol estudiante."
           }
         },
         {
@@ -974,7 +974,7 @@
                 "iniciar"
               ]
             },
-            "description": "RF-23 / CU-12 (DT-10): marca que el estudiante llego al modulo, para calcular el tiempo empleado en sus actividades. Idempotente. Exclusivo del rol estudiante. Requiere que el modulo pertenezca a la ruta asignada al estudiante (ver Asignar ruta de aprendizaje a estudiante)."
+            "description": "RF-23 / CU-12 (DT-10): marca que el estudiante llego al modulo, para calcular el tiempo empleado en sus actividades, y recalcula el progreso de la ruta (un modulo de solo lectura queda completado al iniciarse, ver DT-14). Idempotente. Exclusivo del rol estudiante. Requiere que el modulo pertenezca a la ruta asignada al estudiante (ver Asignar ruta de aprendizaje a estudiante)."
           }
         },
         {

@@ -49,7 +49,8 @@ export class ResultadoRepo {
     return resultado !== null;
   }
 
-  // RF-23: usado para recalcular el progreso de la ruta tras completar una actividad.
+  // RF-22, RF-23: usado por CalculadorProgreso para saber si un modulo tiene todas sus
+  // actividades completadas (DT-14).
   async contarActividadesCompletadasEnRuta(
     idUsuario: number,
     idsActividad: number[]
@@ -86,7 +87,8 @@ export class ResultadoRepo {
     });
   }
 
-  // RF-24: usado para bloquear reintentos una vez que la evaluacion fue aprobada.
+  // RF-24: usado para bloquear reintentos una vez que la evaluacion fue aprobada, y por
+  // CalculadorProgreso para saber si el modulo tiene su evaluacion aprobada (DT-14).
   async existeAprobadaPorUsuarioYEvaluacion(
     idUsuario: number,
     idEvaluacion: number,
@@ -97,27 +99,5 @@ export class ResultadoRepo {
       select: { idResultado: true },
     });
     return resultado !== null;
-  }
-
-  // RF-24: usado por CalculadorProgreso. Cuenta evaluaciones distintas (no intentos) con al
-  // menos un resultado aprobado, dentro de las evaluaciones de la ruta.
-  async contarEvaluacionesAprobadasEnRuta(
-    idUsuario: number,
-    idsEvaluacion: number[],
-    umbral: number
-  ): Promise<number> {
-    if (idsEvaluacion.length === 0) {
-      return 0;
-    }
-    const aprobadas = await this.prisma.resultado.findMany({
-      where: {
-        idUsuario,
-        idEvaluacion: { in: idsEvaluacion },
-        puntuacion: { gte: umbral },
-      },
-      distinct: ["idEvaluacion"],
-      select: { idEvaluacion: true },
-    });
-    return aprobadas.length;
   }
 }
