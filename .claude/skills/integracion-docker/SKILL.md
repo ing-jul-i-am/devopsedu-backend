@@ -15,7 +15,8 @@ Este skill define los patrones obligatorios para interactuar con el motor Docker
 4. **Verifica recursos antes de desplegar** invocando a `VerificadorRecursos` (RF-09, CU-04).
 5. **Nombres de contenedor determinísticos**: `devopsedu-<idServicio>-<nombre_normalizado>`.
 6. **Antes de crear un contenedor, retira el que ya exista.** Desplegar recrea: es lo que hace efectiva una configuración editada (RF-08). La sonda de existencia es `listarVolumenesDelContenedor`, que lanza `ContenedorNoEncontradoError` si no hay contenedor. Ver `docs/decisiones-tecnicas.md` DT-15.
-7. **Al retirar un contenedor, elimina sus volúmenes que no sean bind mount.** Qué volúmenes son se le pregunta a Docker (`inspect` → `Mounts` con `Type === "volume"`), nunca se deduce del JSON de la configuración guardada: esa configuración pudo editarse después del despliegue. Un `VolumenEnUsoError` (409) se omite y se informa; un `VolumenNoEncontradoError` (404) se ignora. Nunca abortan la operación.
+7. **Al retirar un contenedor, elimina sus volúmenes que no sean bind mount.** Qué volúmenes son se le pregunta a Docker (`inspect` → `Mounts` con `Type === "volume"`), nunca se deduce del JSON de la configuración guardada: esa configuración pudo editarse después del despliegue. `listarVolumenesDelContenedor` devuelve `VolumenMontado[]` (`nombre`, `destino`, `anonimo`). Un `VolumenEnUsoError` (409) se omite y se informa en `volumenesOmitidos`; un `VolumenNoEncontradoError` (404) cuenta como eliminado, porque el flag `v` de `remove` ya lo arrastró. Ninguno aborta la operación.
+8. **Toda advertencia al usuario sobre pérdida de datos sale de los montajes reales, nunca de la configuración guardada.** Son cosas distintas y el desajuste es silencioso justo en el caso peor: los volúmenes anónimos que declara la imagen (`postgres`, `mysql`, `mongo`, `redis`) no aparecen en la configuración y contienen todos los datos del estudiante. `GestorDocker.consultarMontajes` es la consulta de solo lectura que alimenta esos avisos. Ver `docs/decisiones-tecnicas.md` DT-17.
 
 ## 2. Estrategia de pruebas
 
@@ -285,6 +286,8 @@ La actualización del estado y el registro se hacen en una transacción cuando a
 - [ ] Desplegar retira el contenedor preexistente antes de crear el nuevo (DT-15).
 - [ ] Los volúmenes a eliminar salen de `inspect`, no de la configuración guardada.
 - [ ] Un volumen en uso por otro contenedor se omite, no hace fallar la operación.
+- [ ] Lo que se anuncia antes de la operación y lo que se reporta después coinciden (DT-17).
+- [ ] Una consulta de solo lectura a Docker degrada si el motor no responde; no tumba el endpoint.
 - [ ] Eventos en log estructurado con campo `evento`.
 - [ ] Pruebas con valores límite (memoria negativa, imagen inexistente, conflicto de nombre).
 - [ ] Todas las pruebas pasan (`npm test`).

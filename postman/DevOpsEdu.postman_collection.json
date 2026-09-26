@@ -307,8 +307,37 @@
                 "{{idServicio}}"
               ]
             },
-            "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue).\n\nDT-15: cada elemento de configuracion.volumenes trae el campo derivado de solo lectura 'tipo' ('bind' o 'volumen'). El frontend lo usa para advertir que los de tipo 'volumen' se destruyen al redesplegar o eliminar."
-          }
+            "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue).\n\nDT-15: cada elemento de configuracion.volumenes trae el campo derivado de solo lectura 'tipo' ('bind' o 'volumen'). El frontend lo usa para advertir que los de tipo 'volumen' se destruyen al redesplegar o eliminar.\n\nDT-17: la respuesta incluye el objeto 'contenedor' con los volumenes que el contenedor tiene montados REALMENTE, consultados a Docker. Es la unica base exacta para advertir al estudiante que perdera al desplegar o eliminar: configuracion.volumenes describe lo que se pidio, no lo que esta montado, y no ve los volumenes anonimos que crean postgres, mysql, mongo y redis por su instruccion VOLUME.\n\nFormas posibles: { existe: true, volumenes: [...] } | { existe: false, volumenes: [] } | null cuando no se pudo consultar a Docker (la respuesta sigue siendo 200). Cada volumen trae nombre, destino y anonimo; para mostrarlo al usuario conviene el destino, porque el nombre de un anonimo es un hash."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 detalle del servicio', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.have.property('configuracion');",
+                  "});",
+                  "",
+                  "// DT-17: montajes reales, la base del dialogo de confirmacion del frontend.",
+                  "pm.test('incluye el estado real del contenedor', function () {",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('contenedor');",
+                  "    if (datos.contenedor === null) {",
+                  "        console.log('No se pudo consultar a Docker; advertir en generico.');",
+                  "        return;",
+                  "    }",
+                  "    pm.expect(datos.contenedor.volumenes).to.be.an('array');",
+                  "    const perdidas = datos.contenedor.volumenes.map(function (v) {",
+                  "        return v.destino + (v.anonimo ? ' (volumen creado por la imagen)' : '');",
+                  "    });",
+                  "    console.log('Se perderia al redesplegar:', perdidas.join(', ') || 'nada');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Editar configuracion de servicio",
@@ -367,7 +396,7 @@
                 "desplegar"
               ]
             },
-            "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend.\n\nDT-15: si el contenedor del servicio ya existe (estado detenido o fallido), se elimina y se vuelve a crear con la configuracion vigente. Es lo que hace efectiva una edicion hecha con 'Editar configuracion de servicio'. Al recrear se DESTRUYEN los volumenes que no son bind mount (los que en la respuesta traen tipo: 'volumen') y los volumenes anonimos; los bind mount se conservan. La respuesta incluye recreado, volumenesEliminados y volumenesOmitidos.\n\nUn servicio en_ejecucion no es origen valido: hay que detenerlo primero."
+            "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend.\n\nDT-15: si el contenedor del servicio ya existe (estado detenido o fallido), se elimina y se vuelve a crear con la configuracion vigente. Es lo que hace efectiva una edicion hecha con 'Editar configuracion de servicio'. Al recrear se DESTRUYEN los volumenes que no son bind mount (los que en la respuesta traen tipo: 'volumen') y los volumenes anonimos; los bind mount se conservan. La respuesta incluye recreado, volumenesEliminados y volumenesOmitidos.\n\nUn servicio en_ejecucion no es origen valido: hay que detenerlo primero.\n\nDT-17: antes de confirmar esta operacion en la interfaz, consultar 'Ver detalle de servicio' y enumerar contenedor.volumenes. Esa lista coincide con el volumenesEliminados que devuelve este request."
           },
           "event": [
             {
@@ -508,7 +537,7 @@
                 "{{idServicio}}"
               ]
             },
-            "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico.\n\nDT-15: elimina tambien los volumenes del contenedor que no son bind mount. La respuesta incluye volumenesEliminados y volumenesOmitidos (estos ultimos son los que otro contenedor sigue usando y por eso se conservaron).\n\nDT-16: libera el nombre del servicio. Tras eliminarlo se puede volver a crear otro servicio con el mismo nombre, que es la via para corregir un nombre mal escrito cuando una actividad exige uno concreto."
+            "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico.\n\nDT-15: elimina tambien los volumenes del contenedor que no son bind mount. La respuesta incluye volumenesEliminados y volumenesOmitidos (estos ultimos son los que otro contenedor sigue usando y por eso se conservaron).\n\nDT-16: libera el nombre del servicio. Tras eliminarlo se puede volver a crear otro servicio con el mismo nombre, que es la via para corregir un nombre mal escrito cuando una actividad exige uno concreto.\n\nDT-17: igual que al desplegar, el detalle previo dice con exactitud que volumenes se van a destruir."
           },
           "event": [
             {

@@ -688,6 +688,12 @@ servicio pensaba reutilizar si se pierde.
   ver en `docker volume ls` el nombre que escribio, lo que rompe el valor didactico y los criterios
   de validacion automatica de actividades (DT-10). Descartada.
 
+**Nota posterior (2026-09-26):** al adaptar el frontend se vio que esta decision dejaba al cliente
+sin forma de saber que se iba a destruir, porque solo dispone de la configuracion y aqui se
+establecio que la fuente de verdad es Docker. DT-17 cierra ese hueco exponiendo los montajes
+reales en el detalle del servicio, y corrige el reporte de `volumenesEliminados`, que omitia los
+volumenes anonimos pese a destruirlos.
+
 ---
 
 ## DT-16: el nombre de un servicio se libera al eliminarlo, via columna nombre_activo (RF-05, RF-14)
@@ -753,3 +759,94 @@ incluye el `idServicio`, que siempre es nuevo, asi que reutilizar un nombre no c
   original por otra via, pero el nombre del contenedor se deriva del nombre del servicio y no se
   persiste, de modo que renombrar dejaria huerfano el contenedor anterior sin forma de localizarlo.
   Descartada para esta etapa; exigiria persistir el nombre de contenedor real.
+
+---
+
+## DT-17: el detalle del servicio expone los montajes reales del contenedor (RF-17, RF-11, RF-14)
+
+**Fecha:** 2026-09-26
+
+**Contexto:** DT-15 establecio que los volumenes a destruir se determinan preguntandole a Docker
+que tiene montado el contenedor, no leyendo la configuracion guardada. Al adaptar el frontend al
+contrato nuevo se detecto la consecuencia no prevista: **el cliente no tiene acceso a esa fuente
+de verdad**. El dialogo de confirmacion previo a desplegar o eliminar solo podia construirse con
+`configuracion.volumenes`, de modo que podia mentirle al estudiante justo antes de una operacion
+irreversible. El desajuste ocurre en tres formas:
+
+1. **Volumen quitado de la configuracion.** Se despliega con `datos-redis`, se edita la
+   configuracion para quitarlo, se redespliega: el contenedor viejo lo sigue montando y se
+   destruye, pero la configuracion ya no lo menciona.
+2. **Volumenes anonimos.** Cuatro de las siete imagenes del catalogo declaran `VOLUME`:
+   `postgres:16-alpine` (`/var/lib/postgresql/data`), `mysql:8` (`/var/lib/mysql`), `mongo:7`
+   (`/data/db`, `/data/configdb`) y `redis:7-alpine` (`/data`). Desplegar cualquiera de ellas con
+   `volumenes: []` —el cuerpo por defecto de la coleccion Postman— hace que Docker cree un volumen
+   anonimo con la base de datos entera dentro. La configuracion lista cero volumenes, asi que el
+   dialogo afirmaria "no se perdera nada" y acto seguido se borraria todo. Es el caso mas grave
+   porque es silencioso y el mas comun porque no requiere que el estudiante haga nada raro.
+3. **Volumen agregado sin redesplegar.** El aviso prometeria una perdida que no va a ocurrir.
+
+Ademas, al verificar contra Docker real se descubrio un defecto en el reporte de DT-15:
+`eliminarContenedor` usa `remove({ force: true, v: true })`, que ya arrastra los volumenes
+anonimos, de modo que el `eliminarVolumen` posterior recibia un 404 y el volumen se descartaba en
+silencio. El resultado es que `volumenesEliminados` **omitia precisamente los volumenes anonimos**,
+aunque se hubieran destruido. El mensaje posterior tambien mentia, por omision.
+
+**Decision:**
+
+1. **`GET /api/servicios/:idServicio` incorpora el objeto `contenedor`** con `existe` y la lista de
+   volumenes realmente montados. Cada volumen trae `nombre`, `destino` y `anonimo`. Se incluye el
+   destino porque el nombre de un volumen anonimo es un hash de 64 caracteres sin significado: la
+   ruta es lo unico que le dice al estudiante que va a perder.
+2. **`anonimo` se detecta por el nombre.** La API de Docker no expone ninguna bandera que
+   distinga un volumen anonimo; solo se sabe porque Docker los nombra con un hash de 64
+   hexadecimales. `esVolumenAnonimo` (`src/dominio/tipo-volumen.ts`) aplica esa convencion. Es una
+   heuristica, estable en las versiones actuales de Docker y verificada contra el entorno real,
+   pero heuristica: si Docker cambiara el esquema de nombres, un anonimo se reportaria como
+   nombrado. La consecuencia seria cosmetica (se mostraria el hash en vez de la etiqueta de
+   "creado por la imagen"), nunca un borrado incorrecto, porque la decision de eliminar no depende
+   de esta marca.
+3. **La consulta vive en `GestorDocker`, no en `GestorServicios`.** Se agrega
+   `consultarMontajes(idUsuario, idServicio)`, de solo lectura: no muta estado ni deja registro en
+   `registro_despliegue`, porque no es una operacion del ciclo de vida. El controlador compone los
+   dos gestores, que ya recibia, con `Promise.all` para no sumar latencia. Asi `GestorServicios`
+   sigue sin hablar con Docker y no hubo que tocar la composicion de dependencias.
+4. **Degradacion en lugar de fallo.** Si el motor no responde, `consultarMontajes` devuelve `null`
+   y el detalle sigue respondiendo `200` con su configuracion y su historico. El detalle es RF-17
+   y debe funcionar sin Docker; el frontend interpreta `null` como "no se pudo verificar" y
+   advierte en generico. Se omite la llamada a Docker cuando el estado es `configurado` o
+   `eliminado`: por la maquina de estados no puede haber contenedor.
+5. **Solo en el detalle, no en el panel.** Incluirlo en `GET /api/servicios` obligaria a un
+   `inspect` por servicio en cada carga de la pantalla que mas se recarga. El frontend consulta el
+   detalle al abrir el dialogo: una llamada por clic, no por refresco.
+6. **`volumenesEliminados` incluye los volumenes anonimos.** Un `VolumenNoEncontradoError` tras
+   haber retirado el contenedor significa que Docker ya lo destruyo, no que no pasara nada: estaba
+   montado antes y ya no existe. Se cuenta como eliminado. Esto hace que lo anunciado por
+   `consultarMontajes` y lo reportado por la operacion cuadren, que es lo que impide que el dialogo
+   previo y el mensaje posterior se contradigan.
+
+**Consecuencias:** El frontend puede enumerar con exactitud lo que se va a destruir, incluidos los
+volumenes que el estudiante nunca declaro. El detalle pasa a hacer una llamada a Docker por
+peticion, acotada a un `inspect` (milisegundos, muy por debajo del RNF-07) y evitada por completo
+en los estados sin contenedor. `listarVolumenesDelContenedor` cambia su tipo de retorno de
+`string[]` a `VolumenMontado[]`; su unico consumidor previo, `retirarContenedor`, se limita a
+mapear los nombres. `configuracion.volumenes[].tipo` (DT-15) deja de ser la base del dialogo de
+confirmacion y queda como ayuda al estudiante mientras edita la configuracion.
+
+Comprobado end to end con Docker real: un servicio `postgres:16-alpine` con `volumenes: []` reporta
+en el detalle su volumen anonimo en `/var/lib/postgresql/data`, y la lista anunciada coincide
+exactamente con el `volumenesEliminados` del redespliegue siguiente.
+
+**Alternativas consideradas:**
+- Dejarlo en el frontend, redactando el aviso como "los volumenes de la configuracion actual" en
+  vez de prometer una lista completa. Fue la mitigacion que propuso la revision del frontend.
+  Reduce el daño en los casos 1 y 3, pero no cubre el 2, que es el peligroso: ahi el aviso seria
+  exacto en su redaccion y aun asi el estudiante perderia la base de datos sin haber sido
+  advertido. Descartada.
+- Persistir los montajes en base de datos al desplegar y servirlos desde ahi, sin consultar a
+  Docker en el detalle. Evita la llamada al motor, pero reintroduce el problema que DT-15 resolvio:
+  el registro se desincroniza en cuanto algo cambia fuera de la plataforma, y Docker ya es la
+  fuente de verdad. Descartada.
+- Un parametro `?incluirContenedor=true` para que el detalle solo consulte a Docker cuando el
+  frontend lo pida. Mantiene barato el detalle normal, pero introduce dos formas de respuesta que
+  documentar y mantener, y el coste que ahorra es un `inspect`. Descartada por el desarrollador.
+- Exponerlo tambien en el panel. Descartada por el coste de N `inspect` en cada carga.

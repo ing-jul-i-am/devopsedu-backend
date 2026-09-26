@@ -49,6 +49,12 @@ base de datos y resincroniza automaticamente (ver 3.6):
   servicio esta activo; al eliminarlo queda libre para reutilizarse (3.5, 3.9.1).
   Un nombre duplicado entre servicios activos ahora responde `409` con
   `NombreServicioDuplicadoError`; antes provocaba un `500`.
+- RF-17, DT-17: `GET /api/servicios/:idServicio` agrega el objeto `contenedor` con
+  los volumenes que el contenedor tiene montados **realmente** (3.6). El dialogo de
+  confirmacion previo a desplegar o eliminar debe construirse con ese campo y no con
+  `configuracion.volumenes`, que puede diferir y no ve los volumenes anonimos. Ver
+  3.9.1. Ademas, `volumenesEliminados` ahora incluye los volumenes anonimos, que
+  antes se omitian del reporte pese a destruirse.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -397,6 +403,17 @@ RF-17: detalle del servicio con su historico de operaciones de despliegue.
   "estado": "en_ejecucion",
   "fechaCreacion": "2026-08-07T00:00:00.000Z",
   "configuracion": { "...": "igual a 3.1" },
+  "contenedor": {
+    "existe": true,
+    "volumenes": [
+      { "nombre": "datos-redis", "destino": "/data", "anonimo": false },
+      {
+        "nombre": "55cc6130e6b6b881f5353f86065017a2eccd6a6f88bbdc1d606b28e377edc537",
+        "destino": "/var/lib/postgresql/data",
+        "anonimo": true
+      }
+    ]
+  },
   "registros": [
     {
       "idRegistro": 10,
@@ -410,6 +427,33 @@ RF-17: detalle del servicio con su historico de operaciones de despliegue.
   ]
 }
 ```
+
+#### `contenedor`: lo que el contenedor tiene montado ahora mismo (DT-17)
+
+Estado real consultado a Docker en el momento de la peticion. **Es la unica base exacta para
+advertir al estudiante que perdera al desplegar o eliminar** (ver 3.9.1); `configuracion.volumenes`
+describe lo que se pidio, no lo que esta montado, y los dos pueden diferir.
+
+`contenedor.volumenes` lista solo los montajes de tipo volumen; los bind mount nunca aparecen,
+porque nunca se destruyen. Cada elemento trae:
+
+| Campo | Significado |
+| --- | --- |
+| `nombre` | Nombre del volumen en Docker. Para uno anonimo es un hash de 64 caracteres. |
+| `destino` | Ruta dentro del contenedor. Es la etiqueta legible: para un volumen anonimo es lo unico que dice que contiene. |
+| `anonimo` | `true` si lo creo la imagen por su instruccion `VOLUME` y el estudiante nunca lo declaro. |
+
+El campo tiene tres formas posibles:
+
+| Valor | Significado |
+| --- | --- |
+| `{ "existe": true, "volumenes": [...] }` | Hay contenedor; esos son sus volumenes (la lista puede estar vacia). |
+| `{ "existe": false, "volumenes": [] }` | No hay contenedor: el servicio nunca se desplego, esta eliminado, o el contenedor se borro por fuera. No hay nada que perder. |
+| `null` | No se pudo preguntar a Docker (motor caido u otro fallo de consulta). El resto del detalle es valido y la respuesta sigue siendo `200`: el frontend debe mostrar una advertencia generica en lugar de afirmar que no se perdera nada. |
+
+Cuando el estado es `configurado` o `eliminado` el backend responde
+`{ "existe": false, "volumenes": [] }` sin llegar a consultar a Docker, porque por la maquina de
+estados no puede haber contenedor.
 
 `registros` es el arreglo crudo de `RegistroDespliegue` de Prisma (sin transformar):
 `operacion` es una de `desplegar | detener | reiniciar | eliminar | monitorear`;
@@ -531,6 +575,9 @@ Que volumenes se eliminan se determina preguntandole a Docker que tiene montado 
 contenedor en ese momento, no leyendo la configuracion guardada: si el estudiante edito
 la configuracion despues de desplegar, la guardada ya no describe lo que esta montado.
 
+Los volumenes anonimos cuentan como eliminados aunque Docker los arrastre junto con el
+contenedor: estaban montados antes de la operacion y despues ya no existen.
+
 Los nombres de volumen son globales en Docker, de modo que un volumen puede estar
 compartido con otro contenedor. Si Docker se niega a eliminarlo por estar en uso, la
 operacion **no falla**: el volumen se conserva y su nombre aparece en
@@ -541,10 +588,36 @@ operacion **no falla**: el volumen se conserva y su nombre aparece en
 de nuevo ese nombre. Es la via para corregir un nombre mal escrito cuando una actividad
 exige uno concreto, ya que 3.8 no permite renombrar.
 
-Recomendacion para el frontend: cuando la configuracion vigente tenga algun volumen con
-`tipo: "volumen"`, pedir confirmacion explicita antes de `desplegar` o `eliminar`,
-indicando que se perderan los datos de esos volumenes. Tras la respuesta, mostrar
-`volumenesEliminados` y, si no esta vacio, `volumenesOmitidos`.
+#### Como debe construir el frontend la advertencia (DT-17)
+
+**El dialogo de confirmacion se construye con `contenedor.volumenes` del detalle (3.6), no con
+`configuracion.volumenes`.** Antes de abrir el dialogo de `desplegar` o `eliminar`, pedir
+`GET /api/servicios/:idServicio` y enumerar lo que ese campo devuelva. Tras la respuesta de la
+operacion, mostrar `volumenesEliminados` y, si no esta vacio, `volumenesOmitidos`.
+
+Usar la configuracion para ese dialogo produce avisos falsos en los dos sentidos, porque
+describe lo que se pidio y no lo que esta montado:
+
+| Situacion | Diria la configuracion | Ocurre en realidad |
+| --- | --- | --- |
+| El estudiante quito un volumen de la configuracion sin redesplegar | No se pierde nada | El contenedor viejo aun lo monta: se destruye |
+| El estudiante agrego un volumen sin redesplegar | Se perdera ese volumen | No existe todavia: no se pierde nada |
+| **Volumen anonimo** (el caso silencioso) | No se pierde nada | Se destruye, y suele contener todos los datos |
+
+El tercer caso es el mas grave y el mas comun. Cuatro de las siete imagenes del catalogo (3.3)
+declaran `VOLUME`: `postgres:16-alpine` (`/var/lib/postgresql/data`), `mysql:8`
+(`/var/lib/mysql`), `mongo:7` (`/data/db`, `/data/configdb`) y `redis:7-alpine` (`/data`). Si el
+estudiante despliega cualquiera de ellas con `volumenes: []`, Docker crea un volumen **anonimo**
+con la base de datos entera dentro. Su configuracion lista cero volumenes, asi que un dialogo
+basado en ella afirmaria "no se perdera nada" justo antes de borrarla.
+
+Para presentarlos, apoyarse en `destino` y no en `nombre`: el nombre de un volumen anonimo es un
+hash sin significado. Por ejemplo, "se perdera el contenido de /var/lib/postgresql/data (volumen
+creado por la imagen)".
+
+`configuracion.volumenes[].tipo` (3.1) sigue siendo util, pero para otra cosa: orientar al
+estudiante **mientras edita la configuracion**, mostrandole cuales de los volumenes que esta
+declarando sobreviviran a un redespliegue y cuales no. Para el dialogo de confirmacion no sirve.
 
 Un servicio `en_ejecucion` no es origen valido de `desplegar`: para aplicarle cambios hay
 que `detener` primero. Es deliberado, para que el estudiante no destruya por accidente un
