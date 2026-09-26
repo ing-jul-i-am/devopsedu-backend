@@ -61,10 +61,19 @@ las bases de desarrollo y pruebas).
 
 `datos-redis` es un **volumen nombrado**, no un bind mount. Desde DT-15, volver a desplegar el
 servicio recrea el contenedor y destruye ese volumen, así que los datos que el estudiante haya
-escrito en Redis se pierden en cada redespliegue y también al eliminar el servicio. Es
-didácticamente deseable para el módulo de persistencia: deja ver la diferencia con un bind mount
-como `/datos/redis:/data:rw`, que sobrevive. El criterio de la actividad solo cuenta cuántos
-volúmenes hay, no de qué tipo son, de modo que ambas variantes la aprueban.
+escrito en Redis se pierden en cada redespliegue y también al eliminar el servicio.
+
+Es deliberado y el contenido del módulo 4 lo explica: el bloque "Qué hace DevOpsEdu con tus
+volúmenes" documenta la política de la plataforma, y el bloque de cierre propone un experimento
+en tres pasos donde el estudiante comprueba que con `datos-redis` los datos se pierden y con el
+bind mount `/datos/redis` sobreviven. Ese contraste es el objetivo didáctico del módulo, así que
+la actividad se deja con el volumen nombrado a propósito. El criterio solo cuenta cuántos
+volúmenes hay, no de qué tipo son, de modo que ambas variantes lo aprueban y el estudiante puede
+hacer el experimento sin perder la actividad ya completada.
+
+El experimento está verificado contra Docker real: el entrypoint de `redis:7-alpine` hace `chown`
+del directorio montado, así que un bind mount a una ruta que todavía no existe funciona sin
+preparación previa en el servidor.
 
 Si el nombre del servicio se escribió mal, basta con eliminarlo y volver a crearlo con el nombre
 correcto: desde DT-16 el nombre queda libre al eliminar.
