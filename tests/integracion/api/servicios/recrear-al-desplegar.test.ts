@@ -21,6 +21,7 @@ vi.mock("@/docker/cliente-docker.js", () => ({
 
 import * as clienteDocker from "@/docker/cliente-docker.js";
 import { ContenedorNoEncontradoError } from "@/dominio/errores/contenedor-no-encontrado-error.js";
+import { MotorDockerNoDisponibleError } from "@/dominio/errores/motor-docker-no-disponible-error.js";
 import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
@@ -91,7 +92,7 @@ describe("Recreacion al desplegar y liberacion del nombre", () => {
       .send({ configuracion: configValida(5441) });
 
     vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue([
-      "datos-redis",
+      { nombre: "datos-redis", destino: "/data", anonimo: false },
     ]);
 
     // Act
@@ -146,7 +147,7 @@ describe("Recreacion al desplegar y liberacion del nombre", () => {
     const auth = { Authorization: `Bearer ${token}` };
     await request(app).post(`/api/servicios/${id}/desplegar`).set(auth);
     vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue([
-      "datos-redis",
+      { nombre: "datos-redis", destino: "/data", anonimo: false },
     ]);
 
     // Act
@@ -191,6 +192,78 @@ describe("Recreacion al desplegar y liberacion del nombre", () => {
     // Assert
     expect(repetido.status).toBe(409);
     expect(repetido.body.error).toContain("servidor-web");
+  });
+
+  // DT-17: el dialogo de confirmacion del frontend no puede construirse desde la configuracion,
+  // porque puede diferir de lo que el contenedor tiene montado. El detalle expone lo real.
+  describe("GET /api/servicios/:id expone los montajes reales del contenedor", () => {
+    it("lista los volumenes montados, marcando los anonimos que creo la imagen", async () => {
+      // Arrange
+      const token = await tokenDe("elsa@devopsedu.local");
+      const { body } = await crearServicio(token, "cache");
+      const id = body.idServicio as number;
+      const auth = { Authorization: `Bearer ${token}` };
+      await request(app).post(`/api/servicios/${id}/desplegar`).set(auth);
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue([
+        { nombre: "datos-redis", destino: "/data", anonimo: false },
+        { nombre: "55cc6130", destino: "/var/lib/postgresql/data", anonimo: true },
+      ]);
+
+      // Act
+      const detalle = await request(app)
+        .get(`/api/servicios/${id}`)
+        .set(auth);
+
+      // Assert
+      expect(detalle.status).toBe(200);
+      expect(detalle.body.contenedor).toEqual({
+        existe: true,
+        volumenes: [
+          { nombre: "datos-redis", destino: "/data", anonimo: false },
+          {
+            nombre: "55cc6130",
+            destino: "/var/lib/postgresql/data",
+            anonimo: true,
+          },
+        ],
+      });
+    });
+
+    it("informa que no hay contenedor en un servicio recien creado, sin consultar a Docker", async () => {
+      // Arrange
+      const token = await tokenDe("ivan@devopsedu.local");
+      const { body } = await crearServicio(token, "cache");
+
+      // Act
+      const detalle = await request(app)
+        .get(`/api/servicios/${body.idServicio}`)
+        .set({ Authorization: `Bearer ${token}` });
+
+      // Assert
+      expect(detalle.body.contenedor).toEqual({ existe: false, volumenes: [] });
+      expect(clienteDocker.listarVolumenesDelContenedor).not.toHaveBeenCalled();
+    });
+
+    // El detalle es RF-17: debe seguir sirviendo configuracion e historico aunque Docker no este.
+    it("devuelve 200 con contenedor null cuando el motor Docker no responde", async () => {
+      // Arrange
+      const token = await tokenDe("olga@devopsedu.local");
+      const { body } = await crearServicio(token, "cache");
+      const id = body.idServicio as number;
+      const auth = { Authorization: `Bearer ${token}` };
+      await request(app).post(`/api/servicios/${id}/desplegar`).set(auth);
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockRejectedValue(
+        new MotorDockerNoDisponibleError()
+      );
+
+      // Act
+      const detalle = await request(app).get(`/api/servicios/${id}`).set(auth);
+
+      // Assert
+      expect(detalle.status).toBe(200);
+      expect(detalle.body.contenedor).toBeNull();
+      expect(detalle.body.configuracion.imagenDocker).toBe("redis:7-alpine");
+    });
   });
 
   it("expone el tipo de cada volumen para que el frontend advierta la perdida de datos", async () => {

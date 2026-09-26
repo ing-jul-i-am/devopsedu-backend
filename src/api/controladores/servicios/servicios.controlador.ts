@@ -155,11 +155,17 @@ export function crearControladoresServicios(
     try {
       const usuario = usuarioDe(req);
       const idServicio = idServicioDe(req);
-      const { servicio, registros } = await gestorServicios.obtenerDetalle(
-        usuario.idUsuario,
-        idServicio
-      );
-      res.status(200).json({ ...aServicioRespuesta(servicio), registros });
+      // DT-17: el detalle agrega los volumenes realmente montados, que es lo unico exacto para
+      // advertir al estudiante antes de confirmar un despliegue o una eliminacion. La consulta a
+      // Docker la mantiene GestorDocker, porque GestorServicios no habla con el motor; ambas van
+      // en paralelo para no sumar latencia.
+      const [{ servicio, registros }, contenedor] = await Promise.all([
+        gestorServicios.obtenerDetalle(usuario.idUsuario, idServicio),
+        gestorDocker.consultarMontajes(usuario.idUsuario, idServicio),
+      ]);
+      res
+        .status(200)
+        .json({ ...aServicioRespuesta(servicio), contenedor, registros });
     } catch (error) {
       next(error);
     }

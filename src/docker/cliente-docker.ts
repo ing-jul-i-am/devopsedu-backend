@@ -12,6 +12,7 @@ import { ContenedorNoEncontradoError } from "../dominio/errores/contenedor-no-en
 import { MotorDockerNoDisponibleError } from "../dominio/errores/motor-docker-no-disponible-error.js";
 import { VolumenEnUsoError } from "../dominio/errores/volumen-en-uso-error.js";
 import { VolumenNoEncontradoError } from "../dominio/errores/volumen-no-encontrado-error.js";
+import { esVolumenAnonimo } from "../dominio/tipo-volumen.js";
 
 const docker = new Docker();
 
@@ -36,6 +37,14 @@ export interface ConsumoContenedor {
 export interface EstadoContenedor {
   enEjecucion: boolean;
   estado: string;
+}
+
+// Un volumen realmente montado por el contenedor. "anonimo" distingue los que creo la propia
+// imagen por su instruccion VOLUME, que el estudiante nunca declaro pero contienen sus datos.
+export interface VolumenMontado {
+  nombre: string;
+  destino: string;
+  anonimo: boolean;
 }
 
 // Nombre de contenedor deterministico y reproducible a partir del servicio (RNF-13). Evita
@@ -98,15 +107,27 @@ export async function eliminarContenedor(idOnombre: string): Promise<void> {
 // Se consulta a Docker en lugar de deducirlo del JSON de la configuracion porque esa
 // configuracion puede haberse editado despues del despliegue y ya no describir lo montado.
 // Al traducir el 404 a ContenedorNoEncontradoError sirve tambien como sonda de existencia.
+// Devuelve el destino y la marca de anonimo ademas del nombre, porque el frontend necesita
+// describirle al estudiante que se va a destruir antes de que confirme (DT-17): el nombre de un
+// volumen anonimo es un hash ilegible y solo el destino dice que contiene.
 export async function listarVolumenesDelContenedor(
   idOnombre: string
-): Promise<string[]> {
+): Promise<VolumenMontado[]> {
   try {
     const inspeccion = await docker.getContainer(idOnombre).inspect();
-    return (inspeccion.Mounts ?? [])
-      .filter((montaje) => montaje.Type === "volume")
-      .map((montaje) => montaje.Name)
-      .filter((nombre): nombre is string => Boolean(nombre));
+    return (inspeccion.Mounts ?? []).flatMap<VolumenMontado>((montaje) => {
+      // Los bind mount se descartan: son directorios del host y no se destruyen nunca (DT-15).
+      if (montaje.Type !== "volume" || !montaje.Name) {
+        return [];
+      }
+      return [
+        {
+          nombre: montaje.Name,
+          destino: montaje.Destination,
+          anonimo: esVolumenAnonimo(montaje.Name),
+        },
+      ];
+    });
   } catch (error) {
     throw traducirErrorOperacion(error);
   }

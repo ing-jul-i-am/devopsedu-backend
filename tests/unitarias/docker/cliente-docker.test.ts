@@ -158,6 +158,10 @@ describe("cliente-docker", () => {
   });
 
   describe("listarVolumenesDelContenedor", () => {
+    // Nombre real del volumen que postgres:16-alpine crea por su instruccion VOLUME.
+    const ANONIMO =
+      "55cc6130e6b6b881f5353f86065017a2eccd6a6f88bbdc1d606b28e377edc537";
+
     it("devuelve solo los montajes de tipo volumen y descarta los bind mount", async () => {
       // Arrange
       contenedorMock.inspect.mockResolvedValue({
@@ -165,7 +169,6 @@ describe("cliente-docker", () => {
         Mounts: [
           { Type: "volume", Name: "datos-redis", Destination: "/data" },
           { Type: "bind", Source: "/datos/pg", Destination: "/var/lib/pg" },
-          { Type: "volume", Name: "a1b2c3", Destination: "/tmp/anonimo" },
         ],
       });
 
@@ -173,7 +176,37 @@ describe("cliente-docker", () => {
       const volumenes = await listarVolumenesDelContenedor("x");
 
       // Assert
-      expect(volumenes).toEqual(["datos-redis", "a1b2c3"]);
+      expect(volumenes).toEqual([
+        { nombre: "datos-redis", destino: "/data", anonimo: false },
+      ]);
+    });
+
+    // DT-17: el frontend necesita poder decirle al estudiante que se va a destruir, y un volumen
+    // anonimo de postgres o mysql contiene toda la base de datos aunque el nunca lo declaro.
+    it("marca como anonimo el volumen que crea la propia imagen", async () => {
+      // Arrange
+      contenedorMock.inspect.mockResolvedValue({
+        State: { Running: true, Status: "running" },
+        Mounts: [
+          {
+            Type: "volume",
+            Name: ANONIMO,
+            Destination: "/var/lib/postgresql/data",
+          },
+        ],
+      });
+
+      // Act
+      const volumenes = await listarVolumenesDelContenedor("x");
+
+      // Assert
+      expect(volumenes).toEqual([
+        {
+          nombre: ANONIMO,
+          destino: "/var/lib/postgresql/data",
+          anonimo: true,
+        },
+      ]);
     });
 
     it("devuelve una lista vacia cuando el contenedor no declara montajes", async () => {

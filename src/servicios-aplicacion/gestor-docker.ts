@@ -19,7 +19,10 @@ import type {
 import type { RegistroDespliegueRepo } from "../repositorios/registro-despliegue-repo.js";
 import type { VerificadorRecursos } from "./verificador-recursos.js";
 import type { EvaluadorActividad } from "./evaluador-actividad.js";
-import type { ParametrosContenedor } from "../docker/cliente-docker.js";
+import type {
+  ParametrosContenedor,
+  VolumenMontado,
+} from "../docker/cliente-docker.js";
 import {
   nombreContenedor,
   crearContenedor,
@@ -81,6 +84,14 @@ interface ResultadoRetiro {
   existia: boolean;
   volumenesEliminados: string[];
   volumenesOmitidos: string[];
+}
+
+// Lo que el contenedor tiene montado ahora mismo. Es la unica base exacta para advertir al
+// estudiante que va a perder al recrear o eliminar: la configuracion guardada puede diferir
+// (ver docs/decisiones-tecnicas.md DT-17).
+export interface EstadoMontajes {
+  existe: boolean;
+  volumenes: VolumenMontado[];
 }
 
 export class GestorDocker {
@@ -271,9 +282,9 @@ export class GestorDocker {
     idServicio: number,
     idUsuario: number
   ): Promise<ResultadoRetiro> {
-    let volumenes: string[];
+    let montajes: VolumenMontado[];
     try {
-      volumenes = await listarVolumenesDelContenedor(nombre);
+      montajes = await listarVolumenesDelContenedor(nombre);
     } catch (error) {
       if (error instanceof ContenedorNoEncontradoError) {
         logger.warn({ evento: "contenedor_ya_no_existia", idServicio, idUsuario });
@@ -288,7 +299,7 @@ export class GestorDocker {
     const volumenesEliminados: string[] = [];
     const volumenesOmitidos: string[] = [];
 
-    for (const volumen of volumenes) {
+    for (const { nombre: volumen } of montajes) {
       try {
         await eliminarVolumen(volumen);
         volumenesEliminados.push(volumen);
@@ -306,7 +317,18 @@ export class GestorDocker {
           continue;
         }
         // Volumen anonimo que Docker ya arrastro al eliminar el contenedor con el flag "v".
+        // Estaba montado antes y ya no existe, o sea que se destruyo: cuenta como eliminado. No
+        // reportarlo dejaria fuera justo los volumenes que el estudiante nunca declaro y que
+        // contienen sus datos, y contradiria lo que anuncio consultarMontajes (DT-17).
         if (error instanceof VolumenNoEncontradoError) {
+          volumenesEliminados.push(volumen);
+          logger.warn({
+            evento: "volumen_eliminado",
+            idServicio,
+            idUsuario,
+            volumen,
+            arrastradoPorDocker: true,
+          });
           continue;
         }
         throw error;
@@ -314,6 +336,42 @@ export class GestorDocker {
     }
 
     return { existia: true, volumenesEliminados, volumenesOmitidos };
+  }
+
+  // RF-17 y DT-17: consulta de solo lectura de los volumenes realmente montados, para que el
+  // frontend pueda enumerar con exactitud lo que se destruira antes de que el estudiante
+  // confirme un despliegue o una eliminacion. No muta nada ni deja registro en bitacora.
+  // Devuelve null si no se pudo preguntar a Docker: es informativa y no debe tumbar el detalle.
+  async consultarMontajes(
+    idUsuario: number,
+    idServicio: number
+  ): Promise<EstadoMontajes | null> {
+    const servicio = await this.cargarPropio(idUsuario, idServicio);
+
+    // Por la maquina de estados (4.2.14) estos dos estados no pueden tener contenedor: uno nunca
+    // se desplego y del otro ya se retiro. Evita una llamada a Docker garantizada a vacio.
+    if (servicio.estado === "configurado" || servicio.estado === "eliminado") {
+      return { existe: false, volumenes: [] };
+    }
+
+    const nombre = nombreContenedor(idServicio, servicio.nombre);
+    try {
+      return {
+        existe: true,
+        volumenes: await listarVolumenesDelContenedor(nombre),
+      };
+    } catch (error) {
+      if (error instanceof ContenedorNoEncontradoError) {
+        return { existe: false, volumenes: [] };
+      }
+      logger.warn({
+        evento: "consulta_montajes_no_disponible",
+        idServicio,
+        idUsuario,
+        error: mensajeDe(error),
+      });
+      return null;
+    }
   }
 
   private async cargarPropio(

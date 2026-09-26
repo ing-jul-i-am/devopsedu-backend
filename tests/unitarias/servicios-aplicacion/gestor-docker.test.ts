@@ -26,6 +26,7 @@ import { TransicionInvalidaError } from "@/dominio/errores/transicion-invalida-e
 import { ContenedorNoEncontradoError } from "@/dominio/errores/contenedor-no-encontrado-error.js";
 import { VolumenEnUsoError } from "@/dominio/errores/volumen-en-uso-error.js";
 import { VolumenNoEncontradoError } from "@/dominio/errores/volumen-no-encontrado-error.js";
+import { MotorDockerNoDisponibleError } from "@/dominio/errores/motor-docker-no-disponible-error.js";
 
 function crearDeps() {
   return {
@@ -40,10 +41,15 @@ function crearDeps() {
   };
 }
 
-// Deja el contenedor como "ya existente" con los volumenes indicados.
+// Deja el contenedor como "ya existente" con los volumenes indicados, en la forma que devuelve
+// listarVolumenesDelContenedor (nombre, destino y marca de anonimo, ver DT-17).
+function montaje(nombre: string, anonimo = false) {
+  return { nombre, destino: `/datos/${nombre}`, anonimo };
+}
+
 function contenedorExistenteCon(volumenes: string[]): void {
   vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue(
-    volumenes
+    volumenes.map((nombre) => montaje(nombre))
   );
   vi.mocked(clienteDocker.eliminarContenedor).mockResolvedValue(undefined);
   vi.mocked(clienteDocker.eliminarVolumen).mockResolvedValue(undefined);
@@ -288,7 +294,10 @@ describe("GestorDocker", () => {
       expect(clienteDocker.crearContenedor).toHaveBeenCalled();
     });
 
-    it("no cuenta como eliminado un volumen anonimo que Docker ya arrastro con el contenedor", async () => {
+    // El flag "v" de eliminarContenedor ya arrastro el volumen anonimo, asi que eliminarVolumen
+    // responde 404. Estaba montado antes y ya no existe: se destruyo, y hay que reportarlo. Si no,
+    // volumenesEliminados omitiria justo los volumenes que el estudiante no sabia que tenia.
+    it("cuenta como eliminado un volumen anonimo que Docker ya arrastro con el contenedor", async () => {
       // Arrange
       const dep = crearDeps();
       prepararRedespliegue(dep);
@@ -301,9 +310,30 @@ describe("GestorDocker", () => {
       const resultado = await crearGestor(dep).desplegar(5, 1);
 
       // Assert
-      expect(resultado.volumenesEliminados).toEqual([]);
+      expect(resultado.volumenesEliminados).toEqual(["a1b2c3"]);
       expect(resultado.volumenesOmitidos).toEqual([]);
       expect(clienteDocker.crearContenedor).toHaveBeenCalled();
+    });
+
+    // Lo anunciado por consultarMontajes y lo reportado tras la operacion deben cuadrar: es lo
+    // que impide que el dialogo de confirmacion y el mensaje posterior se contradigan (DT-17).
+    it("reporta como eliminados todos los volumenes que estaban montados", async () => {
+      // Arrange
+      const dep = crearDeps();
+      prepararRedespliegue(dep);
+      contenedorExistenteCon(["datos-redis", "anonimo-1"]);
+      vi.mocked(clienteDocker.eliminarVolumen)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new VolumenNoEncontradoError("anonimo-1"));
+
+      // Act
+      const resultado = await crearGestor(dep).desplegar(5, 1);
+
+      // Assert
+      expect(resultado.volumenesEliminados).toEqual([
+        "datos-redis",
+        "anonimo-1",
+      ]);
     });
 
     it("marca fallido y registra fallo cuando no se puede retirar el contenedor anterior", async () => {
@@ -504,6 +534,122 @@ describe("GestorDocker", () => {
       await expect(crearGestor(dep).eliminar(5, 1)).rejects.toBeInstanceOf(
         TransicionInvalidaError
       );
+    });
+  });
+
+  // DT-17: consulta de solo lectura para que el frontend advierta con exactitud que se perdera.
+  // No muta nada ni deja registro: no es una operacion del ciclo de vida.
+  describe("consultarMontajes", () => {
+    it("devuelve los volumenes que el contenedor tiene montados realmente", async () => {
+      // Arrange
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "detenido" })
+      );
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue([
+        montaje("datos-redis"),
+        montaje("55cc6130", true),
+      ]);
+
+      // Act
+      const resultado = await crearGestor(dep).consultarMontajes(5, 1);
+
+      // Assert
+      expect(resultado).toEqual({
+        existe: true,
+        volumenes: [montaje("datos-redis"), montaje("55cc6130", true)],
+      });
+    });
+
+    // Por la maquina de estados un servicio configurado nunca llego a crear contenedor, asi que
+    // preguntarselo a Docker seria una llamada garantizada a vacio.
+    it("no consulta a Docker cuando el servicio nunca se desplego", async () => {
+      // Arrange
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "configurado" })
+      );
+
+      // Act
+      const resultado = await crearGestor(dep).consultarMontajes(5, 1);
+
+      // Assert
+      expect(resultado).toEqual({ existe: false, volumenes: [] });
+      expect(clienteDocker.listarVolumenesDelContenedor).not.toHaveBeenCalled();
+    });
+
+    it("no consulta a Docker cuando el servicio esta eliminado", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "eliminado" })
+      );
+
+      const resultado = await crearGestor(dep).consultarMontajes(5, 1);
+
+      expect(resultado).toEqual({ existe: false, volumenes: [] });
+      expect(clienteDocker.listarVolumenesDelContenedor).not.toHaveBeenCalled();
+    });
+
+    it("informa que no hay contenedor cuando Docker no lo encuentra", async () => {
+      // Arrange
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "fallido" })
+      );
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockRejectedValue(
+        new ContenedorNoEncontradoError()
+      );
+
+      // Act
+      const resultado = await crearGestor(dep).consultarMontajes(5, 1);
+
+      // Assert
+      expect(resultado).toEqual({ existe: false, volumenes: [] });
+    });
+
+    // Es informativa: si el motor no responde no debe tumbar el detalle del servicio (RF-17).
+    it("devuelve null cuando el motor Docker no esta disponible", async () => {
+      // Arrange
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "en_ejecucion" })
+      );
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockRejectedValue(
+        new MotorDockerNoDisponibleError()
+      );
+
+      // Act
+      const resultado = await crearGestor(dep).consultarMontajes(5, 1);
+
+      // Assert
+      expect(resultado).toBeNull();
+    });
+
+    it("lanza ServicioNoEncontradoError cuando el servicio es de otro usuario", async () => {
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ idUsuario: 99 })
+      );
+
+      await expect(
+        crearGestor(dep).consultarMontajes(5, 1)
+      ).rejects.toBeInstanceOf(ServicioNoEncontradoError);
+    });
+
+    it("no deja registro en la bitacora ni cambia el estado", async () => {
+      // Arrange
+      const dep = crearDeps();
+      dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
+        servicio({ estado: "en_ejecucion" })
+      );
+      vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockResolvedValue([]);
+
+      // Act
+      await crearGestor(dep).consultarMontajes(5, 1);
+
+      // Assert
+      expect(dep.registroRepo.registrar).not.toHaveBeenCalled();
+      expect(dep.servicioRepo.actualizarEstado).not.toHaveBeenCalled();
     });
   });
 
