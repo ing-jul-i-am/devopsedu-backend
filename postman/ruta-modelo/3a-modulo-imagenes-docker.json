@@ -1,0 +1,44 @@
+{
+  "nombre": "Imágenes en Docker",
+  "orden": 3,
+  "contenido": [
+    {
+      "tipo": "texto",
+      "contenido": "## ¿Qué es una imagen?\n\nUna **imagen** es un paquete de solo lectura que contiene todo lo necesario para ejecutar una aplicación: un sistema de archivos base, el entorno de ejecución, las dependencias, el código y la configuración de arranque. Un contenedor es, en esencia, una imagen en ejecución a la que Docker le añade una capa escribible.\n\nComo la imagen nunca se modifica, puedes crear muchos contenedores a partir de ella y todos arrancarán exactamente igual."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Capas\n\nUna imagen está formada por **capas** apiladas. Cada instrucción que modifica el sistema de archivos al construirla (instalar un paquete, copiar archivos) genera una capa nueva.\n\nLas capas tienen dos ventajas:\n\n- **Se reutilizan:** si dos imágenes parten de la misma base, esa base se descarga y se guarda una sola vez.\n- **Se almacenan en caché:** al reconstruir una imagen, Docker solo vuelve a generar las capas que cambiaron y las que vienen después de ellas.\n\nPor eso el orden de las instrucciones importa: lo que cambia poco (dependencias) debe ir antes que lo que cambia seguido (el código de la aplicación)."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Nombres y etiquetas\n\nUna imagen se identifica como `repositorio:etiqueta`. Por ejemplo, en `postgres:16-alpine`:\n\n- `postgres` es el **repositorio**.\n- `16-alpine` es la **etiqueta**: PostgreSQL 16 construido sobre Alpine Linux, una distribución mínima que produce imágenes muy livianas.\n\nSi no indicas etiqueta, Docker usa `latest`. Evítalo en entornos reales: `latest` puede apuntar a una versión distinta cada vez que se descarga, y el despliegue deja de ser reproducible. Las imágenes sugeridas en DevOpsEdu (`nginx:1.27-alpine`, `node:20-alpine`, `redis:7-alpine`, entre otras) siempre fijan una versión por esta razón."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Construir una imagen con un Dockerfile\n\nUn **Dockerfile** es un archivo de texto con las instrucciones para construir una imagen:\n\n```dockerfile\nFROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]\n```\n\n- `FROM` define la imagen base.\n- `WORKDIR` fija el directorio de trabajo.\n- `COPY` copia archivos del proyecto a la imagen.\n- `RUN` ejecuta un comando durante la construcción y genera una capa.\n- `EXPOSE` documenta en qué puerto escucha la aplicación (no lo publica).\n- `CMD` indica el comando que se ejecuta al iniciar el contenedor.\n\nObserva que `package*.json` se copia y se instala **antes** que el resto del código: así, si solo cambia el código, Docker reutiliza la capa de dependencias desde la caché."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Comandos útiles\n\n```bash\ndocker build -t mi-api:1.0 .      # construye una imagen desde el Dockerfile\ndocker images                     # lista las imágenes locales\ndocker pull redis:7-alpine        # descarga una imagen desde el registro\ndocker history mi-api:1.0         # muestra las capas de una imagen\ndocker rmi mi-api:1.0             # elimina una imagen local\n```"
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/",
+      "titulo": "What is an image? (documentación oficial)",
+      "descripcion": "Concepto de imagen, capas y cómo se relacionan con los contenedores."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/reference/dockerfile/",
+      "titulo": "Dockerfile reference (documentación oficial)",
+      "descripcion": "Referencia completa de todas las instrucciones de un Dockerfile."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/build/building/best-practices/",
+      "titulo": "Building best practices (documentación oficial)",
+      "descripcion": "Recomendaciones para construir imágenes pequeñas, seguras y con buen uso de la caché."
+    }
+  ]
+}

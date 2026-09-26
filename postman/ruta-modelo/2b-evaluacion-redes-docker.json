@@ -1,0 +1,56 @@
+{
+  "titulo": "Evaluación: Redes en Docker",
+  "fechaDisponible": "2026-09-01T00:00:00.000Z",
+  "preguntas": [
+    {
+      "pregunta": "¿Cuál es el driver de red que Docker usa por defecto si no se indica ninguno?",
+      "opciones": [
+        "host",
+        "none",
+        "bridge",
+        "overlay"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "En la opción -p 8080:80, ¿qué representa el número 8080?",
+      "opciones": [
+        "El puerto dentro del contenedor",
+        "El puerto del servidor anfitrión",
+        "El número máximo de conexiones permitidas",
+        "El identificador de la red"
+      ],
+      "respuestaCorrecta": 1
+    },
+    {
+      "pregunta": "¿Pueden dos contenedores publicar el mismo puerto del anfitrión al mismo tiempo?",
+      "opciones": [
+        "Sí, siempre",
+        "Sí, pero solo si usan la misma imagen",
+        "No, porque ese puerto del anfitrión ya estaría ocupado",
+        "No, porque cada contenedor solo puede tener un puerto"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "En una red bridge definida por el usuario, ¿cómo puede un contenedor comunicarse con otro?",
+      "opciones": [
+        "Usando el nombre del otro contenedor, gracias al DNS interno de Docker",
+        "Solo mediante la dirección IP del servidor anfitrión",
+        "No pueden comunicarse entre sí",
+        "Únicamente publicando todos sus puertos"
+      ],
+      "respuestaCorrecta": 0
+    },
+    {
+      "pregunta": "¿Qué caracteriza al driver de red host?",
+      "opciones": [
+        "El contenedor queda sin ninguna conexión de red",
+        "Conecta contenedores ubicados en varios servidores",
+        "Obliga a publicar cada puerto con la opción -p",
+        "El contenedor usa directamente la red del servidor, sin aislamiento de red"
+      ],
+      "respuestaCorrecta": 3
+    }
+  ]
+}

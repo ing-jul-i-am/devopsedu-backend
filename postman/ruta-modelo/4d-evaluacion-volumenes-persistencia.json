@@ -1,0 +1,56 @@
+{
+  "titulo": "Evaluación: Volúmenes y persistencia de datos",
+  "fechaDisponible": "2026-09-01T00:00:00.000Z",
+  "preguntas": [
+    {
+      "pregunta": "¿Qué ocurre con los datos escritos en la capa escribible de un contenedor cuando este se elimina?",
+      "opciones": [
+        "Se guardan automáticamente en la imagen",
+        "Se pierden junto con el contenedor",
+        "Se mueven a un volumen con nombre",
+        "Se conservan hasta reiniciar el servidor"
+      ],
+      "respuestaCorrecta": 1
+    },
+    {
+      "pregunta": "¿Cuál es la opción recomendada para persistir los datos de una base de datos en un contenedor?",
+      "opciones": [
+        "Un montaje tmpfs",
+        "La capa escribible del contenedor",
+        "Guardar los datos dentro de la imagen",
+        "Un volumen con nombre"
+      ],
+      "respuestaCorrecta": 3
+    },
+    {
+      "pregunta": "En la opción -v datos-redis:/data:rw, ¿qué representa /data?",
+      "opciones": [
+        "La ruta dentro del contenedor donde se montan los datos",
+        "La carpeta del servidor anfitrión",
+        "El nombre del volumen",
+        "El modo de acceso"
+      ],
+      "respuestaCorrecta": 0
+    },
+    {
+      "pregunta": "¿Cuándo conviene montar un volumen en modo ro?",
+      "opciones": [
+        "Cuando la base de datos necesita escribir mucho",
+        "Nunca, porque Docker no lo permite",
+        "Cuando el contenedor solo necesita leer los datos, para impedir que los modifique",
+        "Cuando se quiere que el volumen se borre al detener el contenedor"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "Montaste un volumen en una ruta del contenedor donde la aplicación no escribe. ¿Qué pasa con sus datos?",
+      "opciones": [
+        "El contenedor no arranca",
+        "Docker corrige la ruta automáticamente",
+        "Los datos se guardan igual en el volumen",
+        "Siguen escribiéndose en la capa efímera y se perderán al eliminar el contenedor"
+      ],
+      "respuestaCorrecta": 3
+    }
+  ]
+}

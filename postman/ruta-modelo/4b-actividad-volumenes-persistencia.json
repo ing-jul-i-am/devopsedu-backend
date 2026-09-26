@@ -1,0 +1,12 @@
+{
+  "descripcion": "Despliega un servicio Redis con almacenamiento persistente. En Mis servicios, crea un servicio con: imagen redis:7-alpine (escrita exactamente así); un puerto con host 6379, contenedor 6379 y protocolo tcp; un volumen con origen datos-redis, destino /data y modo rw; 0.5 de CPU, 256 MB de memoria y 512 MB de almacenamiento. Luego pulsa Desplegar. La actividad se marca como completada automáticamente cuando el despliegue termina con éxito.",
+  "criteriosValidacion": {
+    "operacion": "desplegar",
+    "condiciones": {
+      "imagenDocker": "redis:7-alpine",
+      "volumenesMinimos": 1,
+      "puertosMinimos": 1
+    }
+  },
+  "orden": 1
+}

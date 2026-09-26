@@ -1,0 +1,54 @@
+{
+  "nombre": "Volúmenes y persistencia de datos",
+  "orden": 4,
+  "contenido": [
+    {
+      "tipo": "texto",
+      "contenido": "## El problema: los contenedores son efímeros\n\nEn el módulo de imágenes viste que un contenedor es una imagen de solo lectura más una **capa escribible** que Docker le agrega al crearlo. Todo lo que la aplicación escribe (registros de una base de datos, archivos subidos por usuarios, configuraciones) queda en esa capa.\n\nEl problema aparece al recordar el ciclo de vida: cuando un contenedor se **elimina**, su capa escribible se elimina con él. Si una base de datos guardaba ahí su información, esa información desaparece. Y en la práctica los contenedores se eliminan y se recrean constantemente: para actualizar la imagen, cambiar la configuración o recuperarse de un fallo.\n\nLa solución es guardar los datos **fuera** del contenedor, en un almacenamiento que sobreviva a su eliminación."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Tipos de montaje\n\nDocker ofrece tres formas de conectar almacenamiento externo a un contenedor:\n\n- **Volumen con nombre:** Docker crea y administra un espacio de almacenamiento identificado por un nombre, por ejemplo `datos-redis`. Es la opción recomendada para datos de aplicaciones: es portable, Docker lo gestiona por completo y no depende de la estructura de carpetas del servidor.\n- **Bind mount:** monta una carpeta concreta del servidor anfitrión, por ejemplo `/home/usuario/sitio`, dentro del contenedor. Es útil en desarrollo para editar archivos y ver los cambios al instante, pero ata el contenedor a la estructura de ese servidor.\n- **tmpfs:** almacenamiento en memoria RAM. Es muy rápido, pero se pierde al detener el contenedor; sirve para datos temporales o sensibles que no deben escribirse en disco.\n\nUn mismo volumen puede montarse en varios contenedores, y sigue existiendo aunque ningún contenedor lo esté usando."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Cómo se declara un montaje\n\nEn la línea de comandos, un montaje se indica con la opción `-v origen:destino:modo`:\n\n```bash\n# Volumen con nombre\ndocker run -d --name cache -v datos-redis:/data:rw redis:7-alpine\n\n# Bind mount de solo lectura\ndocker run -d --name web -v /home/usuario/sitio:/usr/share/nginx/html:ro nginx:1.27-alpine\n```\n\n- **origen:** si es un nombre simple (`datos-redis`), Docker lo interpreta como un volumen con nombre y lo crea si no existe. Si es una ruta absoluta (`/home/usuario/sitio`), es un bind mount.\n- **destino:** la ruta **dentro** del contenedor donde aparecerán los datos.\n- **modo:** `rw` (lectura y escritura) o `ro` (solo lectura). Usa `ro` cuando el contenedor solo necesita leer, por ejemplo el contenido estático de un sitio web: así un error o un ataque no puede modificarlo.\n\nEn DevOpsEdu, estos tres valores son los campos **Origen**, **Destino** y **Modo** de la sección de volúmenes al crear un servicio."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## ¿En qué ruta guarda sus datos cada imagen?\n\nPara que un volumen sirva de algo, el **destino** debe ser la carpeta donde la aplicación realmente escribe. Cada imagen documenta esa ruta en su página de Docker Hub. Algunos ejemplos de imágenes disponibles en la plataforma:\n\n- `redis:7-alpine` guarda sus instantáneas en `/data`.\n- `postgres:16-alpine` guarda sus bases de datos en `/var/lib/postgresql/data`.\n- `mysql:8` guarda sus bases de datos en `/var/lib/mysql`.\n- `mongo:7` guarda sus bases de datos en `/data/db`.\n- `nginx:1.27-alpine` sirve los archivos del sitio desde `/usr/share/nginx/html`.\n\nSi montas el volumen en una ruta equivocada, el contenedor arranca sin errores, pero los datos se siguen escribiendo en la capa efímera y se perderán igual."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Comandos útiles\n\n```bash\ndocker volume create datos-redis   # crea un volumen con nombre\ndocker volume ls                   # lista los volúmenes\ndocker volume inspect datos-redis  # muestra dónde se almacena y sus detalles\ndocker volume rm datos-redis       # elimina el volumen y sus datos\ndocker volume prune                # elimina los volúmenes que ningún contenedor usa\n```\n\nEliminar un contenedor **no** elimina sus volúmenes con nombre: hay que borrarlos explícitamente. Esa es precisamente la garantía que buscamos."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## ¿Qué acabas de construir?\n\nEl servicio de la actividad reúne lo visto en toda la ruta:\n\n- Un **contenedor** con límites de CPU y memoria (Introducción a contenedores).\n- Un **puerto publicado** que lo hace accesible desde fuera del servidor (Redes en Docker).\n- Una **imagen** con versión fija, `redis:7-alpine` (Imágenes en Docker).\n- Un **volumen con nombre** donde Redis guarda sus datos (este módulo).\n\nGracias al volumen, si eliminas este servicio y creas otro con el mismo volumen `datos-redis` montado en `/data`, el nuevo Redis encontrará la información que guardó el anterior."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/engine/storage/",
+      "titulo": "Storage overview (documentación oficial)",
+      "descripcion": "Visión general del almacenamiento en Docker: volúmenes, bind mounts y tmpfs."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/engine/storage/volumes/",
+      "titulo": "Volumes (documentación oficial)",
+      "descripcion": "Cómo crear, montar, compartir y respaldar volúmenes con nombre."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/engine/storage/bind-mounts/",
+      "titulo": "Bind mounts (documentación oficial)",
+      "descripcion": "Cuándo conviene montar una carpeta del servidor y sus riesgos."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://hub.docker.com/_/redis",
+      "titulo": "Imagen oficial de Redis en Docker Hub",
+      "descripcion": "Documentación de la imagen: puertos, persistencia en /data y opciones de configuración."
+    }
+  ]
+}

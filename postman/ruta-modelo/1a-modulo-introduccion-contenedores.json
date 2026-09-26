@@ -1,0 +1,44 @@
+{
+  "nombre": "Introducción a contenedores",
+  "orden": 1,
+  "contenido": [
+    {
+      "tipo": "texto",
+      "contenido": "## ¿Qué es un contenedor?\n\nUn **contenedor** es un proceso aislado que empaqueta una aplicación junto con todo lo que necesita para ejecutarse: código, entorno de ejecución, bibliotecas y configuración. Gracias a ese empaquetado, la aplicación se comporta igual en la laptop del desarrollador, en el servidor de pruebas y en producción.\n\nEl problema que resuelven es el clásico *\"en mi máquina sí funciona\"*: las diferencias de versiones y dependencias entre entornos dejan de importar, porque el contenedor lleva consigo su propio entorno."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Contenedores frente a máquinas virtuales\n\nAmbas tecnologías aíslan aplicaciones, pero lo hacen a niveles distintos:\n\n- Una **máquina virtual** emula un equipo completo e incluye su propio sistema operativo. Arranca en minutos y consume gigabytes de memoria y disco.\n- Un **contenedor** comparte el *kernel* del sistema operativo anfitrión y solo aísla los procesos, el sistema de archivos y la red. Arranca en segundos y ocupa megabytes.\n\nPor eso en un mismo servidor pueden ejecutarse decenas de contenedores donde solo cabrían unas pocas máquinas virtuales. El aislamiento se logra con dos mecanismos del kernel de Linux: los **namespaces** (qué puede *ver* el proceso) y los **cgroups** (cuántos recursos puede *consumir*)."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Piezas principales de Docker\n\n- **Imagen:** plantilla de solo lectura con la aplicación y sus dependencias. Por ejemplo, `nginx:1.27-alpine`.\n- **Contenedor:** instancia en ejecución de una imagen. De una misma imagen pueden crearse muchos contenedores.\n- **Docker Engine:** el servicio que construye imágenes y ejecuta contenedores en el servidor.\n- **Registro:** repositorio donde se publican y descargan imágenes. El registro público por defecto es Docker Hub."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Ciclo de vida de un contenedor\n\nUn contenedor pasa por varios estados a lo largo de su vida:\n\n1. **Creado:** existe, pero aún no se ha iniciado.\n2. **En ejecución:** su proceso principal está activo.\n3. **Detenido:** su proceso terminó, pero el contenedor y sus datos internos siguen existiendo; puede volver a iniciarse.\n4. **Eliminado:** el contenedor deja de existir. Los datos que no estuvieran en un volumen se pierden.\n\nDesde la línea de comandos, estas transiciones se hacen así:\n\n```bash\ndocker run -d --name web nginx:1.27-alpine   # crea e inicia\ndocker stop web                              # detiene\ndocker start web                             # vuelve a iniciar\ndocker rm web                                # elimina (debe estar detenido)\n```\n\nEn DevOpsEdu no necesitas escribir estos comandos: los botones **Desplegar**, **Detener**, **Reiniciar** y **Eliminar** de *Mis servicios* ejecutan estas mismas operaciones sobre Docker."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Límites de recursos\n\nComo todos los contenedores comparten el mismo servidor, conviene limitar cuánta **CPU** y **memoria** puede usar cada uno. Así un contenedor con un error o con mucha carga no deja sin recursos a los demás. Esto se configura con opciones como `--cpus` y `--memory`, y es exactamente lo que defines al asignar CPU y memoria a un servicio en la plataforma, antes de que se verifique si el servidor tiene capacidad disponible."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/get-started/docker-overview/",
+      "titulo": "Docker overview (documentación oficial)",
+      "descripcion": "Arquitectura de Docker: cliente, demonio, imágenes, contenedores y registros."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "titulo": "What is a container? (documentación oficial)",
+      "descripcion": "Explicación del concepto de contenedor y su diferencia con las máquinas virtuales."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "titulo": "Referencia de docker container run",
+      "descripcion": "Todas las opciones para crear y ejecutar un contenedor, incluidos los límites de CPU y memoria."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "titulo": "Evaluación: Imágenes en Docker",
+  "fechaDisponible": "2026-09-01T00:00:00.000Z",
+  "preguntas": [
+    {
+      "pregunta": "¿Qué relación existe entre una imagen y un contenedor?",
+      "opciones": [
+        "Son exactamente lo mismo",
+        "La imagen es un contenedor que fue eliminado",
+        "Cada imagen solo puede generar un contenedor",
+        "El contenedor es una instancia en ejecución de una imagen"
+      ],
+      "respuestaCorrecta": 3
+    },
+    {
+      "pregunta": "En la imagen postgres:16-alpine, ¿qué representa 16-alpine?",
+      "opciones": [
+        "El nombre del repositorio",
+        "El puerto en el que escucha la base de datos",
+        "La etiqueta, que indica la versión y la distribución base",
+        "El nombre del contenedor"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "¿Por qué no se recomienda usar la etiqueta latest en despliegues reales?",
+      "opciones": [
+        "Porque latest siempre es una versión inestable",
+        "Porque puede apuntar a versiones distintas con el tiempo y el despliegue deja de ser reproducible",
+        "Porque las imágenes latest no pueden ejecutarse en contenedores",
+        "Porque latest ocupa el doble de espacio en disco"
+      ],
+      "respuestaCorrecta": 1
+    },
+    {
+      "pregunta": "¿Qué instrucción de un Dockerfile define la imagen base?",
+      "opciones": [
+        "RUN",
+        "CMD",
+        "FROM",
+        "EXPOSE"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "¿Por qué conviene copiar e instalar las dependencias antes que el resto del código en un Dockerfile?",
+      "opciones": [
+        "Para que la capa de dependencias se reutilice desde la caché cuando solo cambia el código",
+        "Porque Docker exige ese orden para poder construir la imagen",
+        "Para que la imagen final no incluya las dependencias",
+        "Para publicar automáticamente los puertos de la aplicación"
+      ],
+      "respuestaCorrecta": 0
+    }
+  ]
+}

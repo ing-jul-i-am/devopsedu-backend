@@ -1,0 +1,44 @@
+{
+  "nombre": "Redes en Docker",
+  "orden": 2,
+  "contenido": [
+    {
+      "tipo": "texto",
+      "contenido": "## ¿Por qué necesitan red los contenedores?\n\nCada contenedor tiene su propio espacio de red aislado: su propia interfaz, su propia dirección IP y su propia tabla de puertos. Ese aislamiento es útil por seguridad, pero una aplicación real casi siempre necesita comunicarse: un servidor web que atiende usuarios, o una API que consulta a su base de datos. Docker resuelve esto con **redes** administradas por *drivers*."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Drivers de red más usados\n\n- **bridge:** es el driver por defecto. Crea una red privada dentro del servidor; los contenedores conectados a ella pueden comunicarse entre sí, pero no son accesibles desde fuera salvo que se publiquen puertos.\n- **host:** el contenedor usa directamente la red del servidor, sin aislamiento. Es más rápido, pero pierde la separación de puertos.\n- **none:** el contenedor no tiene red. Sirve para tareas que no deben comunicarse con nada.\n\nSi no indicas una red al crear un contenedor, Docker lo conecta a la red `bridge` por defecto."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Publicación de puertos\n\nUn contenedor en una red bridge no es visible desde fuera del servidor. Para exponer un servicio hay que **publicar un puerto**, es decir, asociar un puerto del servidor anfitrión con un puerto del contenedor:\n\n```bash\ndocker run -d --name web -p 8080:80 nginx:1.27-alpine\n```\n\nEl formato es `puerto_anfitrion:puerto_contenedor`. En el ejemplo, las peticiones que llegan al puerto **8080** del servidor se redirigen al puerto **80** del contenedor, que es donde escucha Nginx.\n\nDos reglas importantes:\n\n1. Dos contenedores **pueden** usar el mismo puerto interno (los dos pueden escuchar en el 80), porque cada uno tiene su propia red aislada.\n2. Dos contenedores **no pueden** publicar el mismo puerto del anfitrión, porque ese puerto ya estaría ocupado.\n\nCuando configuras los puertos de un servicio en DevOpsEdu, estás definiendo precisamente estas asociaciones."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Comunicación entre contenedores\n\nEn una **red bridge definida por el usuario** (creada con `docker network create`), Docker incluye un DNS interno: cada contenedor puede encontrar a los demás **por su nombre**, sin conocer su dirección IP.\n\n```bash\ndocker network create mi-red\ndocker run -d --name bd --network mi-red postgres:16-alpine\ndocker run -d --name api --network mi-red mi-api:1.0\n```\n\nDentro del contenedor `api`, la base de datos se alcanza con el nombre de host `bd`. Esto es importante porque las direcciones IP de los contenedores cambian cada vez que se recrean, mientras que el nombre se mantiene.\n\nEn la red `bridge` por defecto, esta resolución por nombre **no** está disponible; por eso se recomienda crear redes propias para aplicaciones con varios contenedores."
+    },
+    {
+      "tipo": "texto",
+      "contenido": "## Comandos útiles\n\n```bash\ndocker network ls                 # lista las redes\ndocker network inspect mi-red     # muestra configuración y contenedores conectados\ndocker port web                   # muestra los puertos publicados de un contenedor\n```"
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/engine/network/",
+      "titulo": "Networking overview (documentación oficial)",
+      "descripcion": "Visión general de las redes en Docker y de los drivers disponibles."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/engine/network/drivers/bridge/",
+      "titulo": "Bridge network driver (documentación oficial)",
+      "descripcion": "Diferencias entre la red bridge por defecto y las redes bridge definidas por el usuario."
+    },
+    {
+      "tipo": "enlace",
+      "url": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/",
+      "titulo": "Publishing and exposing ports (documentación oficial)",
+      "descripcion": "Cómo publicar puertos de un contenedor hacia el anfitrión."
+    }
+  ]
+}

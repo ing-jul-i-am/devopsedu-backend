@@ -1,0 +1,56 @@
+{
+  "titulo": "Evaluación: Introducción a contenedores",
+  "fechaDisponible": "2026-09-01T00:00:00.000Z",
+  "preguntas": [
+    {
+      "pregunta": "¿Cuál es la principal diferencia entre un contenedor y una máquina virtual?",
+      "opciones": [
+        "El contenedor incluye su propio sistema operativo completo",
+        "El contenedor comparte el kernel del sistema operativo anfitrión",
+        "La máquina virtual arranca más rápido que el contenedor",
+        "No hay diferencia: son dos nombres para lo mismo"
+      ],
+      "respuestaCorrecta": 1
+    },
+    {
+      "pregunta": "¿Qué es una imagen de Docker?",
+      "opciones": [
+        "Una captura de pantalla del contenedor en ejecución",
+        "Un contenedor que se encuentra detenido",
+        "Una plantilla de solo lectura con la aplicación y sus dependencias",
+        "El servicio que ejecuta los contenedores en el servidor"
+      ],
+      "respuestaCorrecta": 2
+    },
+    {
+      "pregunta": "¿Qué ocurre con un contenedor cuando se detiene?",
+      "opciones": [
+        "Su proceso termina, pero el contenedor sigue existiendo y puede volver a iniciarse",
+        "Se elimina automáticamente junto con sus datos",
+        "Se convierte en una imagen nueva",
+        "Sigue consumiendo CPU hasta que se reinicie el servidor"
+      ],
+      "respuestaCorrecta": 0
+    },
+    {
+      "pregunta": "¿Qué mecanismo del kernel de Linux limita la CPU y la memoria que puede usar un contenedor?",
+      "opciones": [
+        "Namespaces",
+        "Volúmenes",
+        "Registros",
+        "Cgroups"
+      ],
+      "respuestaCorrecta": 3
+    },
+    {
+      "pregunta": "¿Por qué conviene asignar límites de CPU y memoria a cada contenedor?",
+      "opciones": [
+        "Para que la imagen ocupe menos espacio en disco",
+        "Para que el contenedor pueda publicar más puertos",
+        "Para evitar que un contenedor deje sin recursos a los demás del mismo servidor",
+        "Porque Docker no permite iniciar contenedores sin límites"
+      ],
+      "respuestaCorrecta": 2
+    }
+  ]
+}
