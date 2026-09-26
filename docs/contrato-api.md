@@ -39,6 +39,16 @@ base de datos y resincroniza automaticamente (ver 3.6):
   completados (incluye los modulos de solo lectura, que antes dejaban la ruta
   en 0). Se recalcula tambien al iniciar un modulo (6.2) y en cada consulta de
   `mi-ruta` (6.1). La forma de las respuestas no cambia.
+- RF-08, RF-11, DT-15: `POST /api/servicios/:id/desplegar` recrea el contenedor
+  cuando ya existe, de modo que una configuracion editada surte efecto. Al
+  recrear (y al eliminar) se destruyen los volumenes que no son bind mount.
+  `desplegar` y `eliminar` agregan `recreado`, `volumenesEliminados` y
+  `volumenesOmitidos` a su respuesta (3.2), y los volumenes de la configuracion
+  incorporan el campo derivado de solo lectura `tipo` (3.1). Ver 3.9.1.
+- RF-05, RF-14, DT-16: el nombre de un servicio solo esta reservado mientras el
+  servicio esta activo; al eliminarlo queda libre para reutilizarse (3.5, 3.9.1).
+  Un nombre duplicado entre servicios activos ahora responde `409` con
+  `NombreServicioDuplicadoError`; antes provocaba un `500`.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -245,7 +255,8 @@ Usada por `crear`, `editarConfiguracion`, `listar` (panel) y como base de `detal
     ],
     "variablesEntorno": { "POSTGRES_PASSWORD": "ejemplo" },
     "volumenes": [
-      { "origen": "/datos/pg", "destino": "/var/lib/postgresql/data", "modo": "rw" }
+      { "origen": "/datos/pg", "destino": "/var/lib/postgresql/data", "modo": "rw", "tipo": "bind" },
+      { "origen": "datos-redis", "destino": "/data", "modo": "rw", "tipo": "volumen" }
     ]
   }
 }
@@ -255,19 +266,49 @@ Usada por `crear`, `editarConfiguracion`, `listar` (panel) y como base de `detal
 (un servicio sin ninguna version de configuracion); en la practica siempre habra al
 menos la version creada junto con el servicio.
 
+**`volumenes[].tipo` es un campo derivado de solo lectura** (DT-15). El backend lo calcula
+al responder a partir de `origen`, reproduciendo la misma inferencia que hace Docker: es
+`"bind"` cuando el origen es una ruta del host (empieza con `/`, `./`, `../`, `~` o una
+letra de unidad de Windows) y `"volumen"` en cualquier otro caso. **No se envia en las
+peticiones**; si se incluye, se ignora. El frontend lo usa para advertir al estudiante,
+antes de confirmar un redespliegue o una eliminacion, que los volumenes con
+`tipo: "volumen"` se destruyen y los `tipo: "bind"` se conservan (ver 3.9).
+
 Valores posibles de `estado` (maquina de estados, seccion 4.2.14 del diseno):
 `configurado`, `desplegando`, `en_ejecucion`, `detenido`, `reiniciando`, `fallido`,
 `eliminado`.
 
 ### 3.2 Forma comun: objeto ServicioBasico
 
-Usada por las operaciones de control (`desplegar`, `detener`, `reiniciar`, `eliminar`):
+Usada por las operaciones de control `detener` y `reiniciar`:
 
 ```json
 { "idServicio": 1, "nombre": "mi-postgres", "estado": "en_ejecucion" }
 ```
 
 Notese que **no** incluye `descripcion`, `fechaCreacion` ni `configuracion`.
+
+`desplegar` y `eliminar` devuelven esta misma forma **mas tres campos** sobre la limpieza
+del contenedor anterior (DT-15):
+
+```json
+{
+  "idServicio": 1,
+  "nombre": "mi-postgres",
+  "estado": "en_ejecucion",
+  "recreado": true,
+  "volumenesEliminados": ["datos-redis"],
+  "volumenesOmitidos": []
+}
+```
+
+| Campo | Significado |
+| --- | --- |
+| `recreado` | `true` si ya existia un contenedor y hubo que eliminarlo antes de crear el nuevo. En `eliminar` es siempre `false` (no se crea nada). |
+| `volumenesEliminados` | Nombres de los volumenes destruidos junto con el contenedor. Su contenido se perdio. |
+| `volumenesOmitidos` | Volumenes que no se pudieron eliminar porque otro contenedor los sigue montando. Sus datos siguen intactos. |
+
+Las tres listas son siempre arreglos; vacios cuando no hubo nada que retirar.
 
 ### 3.3 `GET /api/servicios/imagenes`
 
@@ -325,6 +366,11 @@ servidor antes de persistir.
 `puertos`, `variablesEntorno` y `volumenes` pueden ser arreglos/objeto vacios, pero los
 tres campos son obligatorios en el cuerpo (no opcionales).
 
+El `nombre` debe ser unico **entre los servicios activos** del usuario. Los servicios en
+estado `eliminado` no lo reservan, asi que un nombre vuelve a estar disponible en cuanto
+se elimina el servicio que lo usaba (DT-16). Usuarios distintos pueden usar el mismo
+nombre sin conflicto.
+
 **Response `201 Created`**: objeto Servicio (seccion 3.1), con `estado: "configurado"`.
 
 **Errores posibles**
@@ -334,6 +380,7 @@ tres campos son obligatorios en el cuerpo (no opcionales).
 | `400` | Cuerpo invalido (ver 1.4) |
 | `401` | Token ausente/invalido/expirado |
 | `403` | Rol sin permiso |
+| `409` | `NombreServicioDuplicadoError` — el usuario ya tiene un servicio **activo** con ese nombre |
 | `422` | `RecursosInsuficientesError` — ver forma extendida en 8.2 |
 
 ### 3.6 `GET /api/servicios/:idServicio`
@@ -422,7 +469,8 @@ RF-18: historico de metricas de consumo, opcionalmente filtrado por rango de fec
 ### 3.8 `PUT /api/servicios/:idServicio/configuracion`
 
 RF-08: registra una nueva version de configuracion para un servicio propio. No
-verifica recursos en este paso (la verificacion ocurre al desplegar).
+verifica recursos en este paso (la verificacion ocurre al desplegar). **No permite
+cambiar `nombre` ni `descripcion`**, solo la configuracion tecnica.
 
 **Request body**
 
@@ -433,12 +481,18 @@ verifica recursos en este paso (la verificacion ocurre al desplegar).
 **Response `200 OK`**: objeto Servicio (seccion 3.1) con la configuracion actualizada
 (la mas reciente pasa a ser la vigente).
 
+Editar la configuracion **no modifica por si solo el contenedor en marcha**: la nueva
+version queda registrada, pero solo surte efecto en el proximo despliegue, que recrea el
+contenedor (ver 3.9). Para un servicio en ejecucion el flujo es `detener` y luego
+`desplegar`.
+
 **Errores posibles**: `400`, `401`, `403`, `404` (`ServicioNoEncontradoError`).
 
 ### 3.9 Operaciones de control del ciclo de vida
 
 RF-11 a RF-14 — CU-05. Ninguna de estas rutas recibe cuerpo. Todas responden
-`200 OK` con un objeto ServicioBasico (seccion 3.2) en exito.
+`200 OK` en exito: `detener` y `reiniciar` con un objeto ServicioBasico, `desplegar` y
+`eliminar` con la forma extendida que informa la limpieza (ambas en la seccion 3.2).
 
 | Metodo y ruta | RF | Transiciones de origen validas | Estado resultante en exito |
 | --- | --- | --- | --- |
@@ -455,21 +509,66 @@ original se propaga al cliente (no se enmascara).
 subyacente puede seguir existiendo aunque el servicio haya quedado `fallido` — por
 ejemplo, si `MonitorPeriodico` lo marco asi tras detectar que se detuvo fuera de la
 plataforma (ver 3.6). En ese caso `reiniciar` equivale a un `docker start`/`docker
-restart` sobre el contenedor existente. Nota: `desplegar` tambien permite origen
-`fallido`, pero solo tiene sentido si el contenedor nunca llego a crearse (intentar
-crear uno con el mismo nombre determinístico responde `409
-NombreContenedorEnUsoError` si ya existe); para el caso de un contenedor detenido que
-sobrevive, usar `reiniciar`, no `desplegar`.
+restart` sobre el contenedor existente, sin recrearlo ni tocar sus volumenes.
+
+#### 3.9.1 Recreacion del contenedor y perdida de volumenes
+
+`desplegar` **recrea el contenedor cuando ya existe** (DT-15). Antes de crear el nuevo
+comprueba contra Docker si el contenedor del servicio sigue presente y, en tal caso, lo
+elimina. Esto es lo que hace que una configuracion editada con `PUT .../configuracion`
+(3.8) surta efecto: la imagen, los puertos, las variables de entorno y los volumenes
+del contenedor nuevo son los de la **configuracion vigente**.
+
+Al retirar el contenedor se destruyen tambien sus volumenes:
+
+| Tipo de montaje | Que ocurre |
+| --- | --- |
+| `tipo: "volumen"` (volumen nombrado, por ejemplo `datos-redis`) | **Se elimina. Su contenido se pierde de forma irreversible.** |
+| Volumen anonimo (declarado por la imagen con `VOLUME`) | Se elimina junto con el contenedor. |
+| `tipo: "bind"` (ruta del host, por ejemplo `/datos/pg`) | **Se conserva.** Es un directorio del host y Docker no lo toca. |
+
+Que volumenes se eliminan se determina preguntandole a Docker que tiene montado el
+contenedor en ese momento, no leyendo la configuracion guardada: si el estudiante edito
+la configuracion despues de desplegar, la guardada ya no describe lo que esta montado.
+
+Los nombres de volumen son globales en Docker, de modo que un volumen puede estar
+compartido con otro contenedor. Si Docker se niega a eliminarlo por estar en uso, la
+operacion **no falla**: el volumen se conserva y su nombre aparece en
+`volumenesOmitidos`.
+
+`DELETE /api/servicios/:idServicio` aplica exactamente la misma limpieza, y ademas
+**libera el nombre del servicio** (DT-16): tras eliminarlo, `POST /api/servicios` acepta
+de nuevo ese nombre. Es la via para corregir un nombre mal escrito cuando una actividad
+exige uno concreto, ya que 3.8 no permite renombrar.
+
+Recomendacion para el frontend: cuando la configuracion vigente tenga algun volumen con
+`tipo: "volumen"`, pedir confirmacion explicita antes de `desplegar` o `eliminar`,
+indicando que se perderan los datos de esos volumenes. Tras la respuesta, mostrar
+`volumenesEliminados` y, si no esta vacio, `volumenesOmitidos`.
+
+Un servicio `en_ejecucion` no es origen valido de `desplegar`: para aplicarle cambios hay
+que `detener` primero. Es deliberado, para que el estudiante no destruya por accidente un
+contenedor en marcha y para que el ciclo de vida siga siendo visible.
 
 **Errores posibles (comunes a las cuatro operaciones)**
 
 | Codigo | Cuando |
 | --- | --- |
 | `401` / `403` | Igual que el resto del grupo |
-| `404` | `ServicioNoEncontradoError` (no existe o no es del usuario) o `ContenedorNoEncontradoError` (el contenedor Docker subyacente no existe, en `detener`/`reiniciar`/`eliminar`) |
-| `409` | `TransicionInvalidaError` — la operacion no es valida desde el estado actual; o `NombreContenedorEnUsoError` — solo en `desplegar` |
+| `404` | `ServicioNoEncontradoError` (no existe o no es del usuario) o `ContenedorNoEncontradoError` (el contenedor Docker subyacente no existe, en `detener`/`reiniciar`) |
+| `409` | `TransicionInvalidaError` — la operacion no es valida desde el estado actual |
 | `422` | `RecursosInsuficientesError` — solo en `desplegar` (ver forma extendida en 8.2); o `ImagenDockerNoDisponibleError` — solo en `desplegar` |
 | `503` | `MotorDockerNoDisponibleError` — el socket de Docker no responde |
+
+Notas sobre los errores desde DT-15:
+
+- `desplegar` ya **no** devuelve `409 NombreContenedorEnUsoError` por un contenedor
+  preexistente del propio servicio: ese es justamente el caso que ahora se recrea.
+- `eliminar` ya no devuelve `404 ContenedorNoEncontradoError`: un servicio sin contenedor
+  (nunca desplegado, o borrado por fuera) se marca `eliminado` igualmente.
+- `VolumenEnUsoError` (409) y `VolumenNoEncontradoError` (404) estan en el catalogo de
+  errores (seccion 9) pero **no llegan al cliente** en estas rutas: la limpieza los
+  absorbe y los refleja en `volumenesOmitidos`.
 
 ---
 
@@ -981,10 +1080,13 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 | `ModuloNoAsignadoError` | 404 | `El modulo no pertenece a tu ruta de aprendizaje` | — |
 | `EvaluacionNoEncontradaError` | 404 | `Evaluacion no encontrada` | — |
 | `ContenedorNoEncontradoError` | 404 | `El contenedor del servicio no existe` | — |
+| `VolumenNoEncontradoError` | 404 | `El volumen <nombre> no existe` | — |
 | `UsuarioNoEncontradoError` | 404 | `Usuario no encontrado` | — |
 | `CorreoYaRegistradoError` | 409 | `El correo ya esta registrado` | — |
+| `NombreServicioDuplicadoError` | 409 | `Ya tienes un servicio activo llamado <nombre>` | — |
+| `VolumenEnUsoError` | 409 | `El volumen <nombre> esta en uso por otro contenedor` | — |
 | `TransicionInvalidaError` | 409 | `No se puede <operacion> un servicio en estado '<estado>'` | — |
-| `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | — |
+| `NombreContenedorEnUsoError` | 409 | `Ya existe un contenedor para este servicio` | Desde DT-15 es practicamente inalcanzable: el contenedor preexistente del propio servicio se recrea |
 | `EvaluacionYaExisteError` | 409 | `El modulo ya tiene una evaluacion asociada` | — |
 | `EvaluacionYaAprobadaError` | 409 | `Ya aprobaste esta evaluacion` | — |
 | `IntentosAgotadosError` | 409 | `Se agotaron los intentos permitidos para esta evaluacion` | — |

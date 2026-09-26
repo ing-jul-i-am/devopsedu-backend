@@ -14,6 +14,8 @@ Este skill define los patrones obligatorios para interactuar con el motor Docker
 3. **Sincroniza el estado del servicio** tras cada operación conforme a la sección 4.2.14: `configurado`, `desplegando`, `en_ejecucion`, `detenido`, `reiniciando`, `fallido`, `eliminado`.
 4. **Verifica recursos antes de desplegar** invocando a `VerificadorRecursos` (RF-09, CU-04).
 5. **Nombres de contenedor determinísticos**: `devopsedu-<idServicio>-<nombre_normalizado>`.
+6. **Antes de crear un contenedor, retira el que ya exista.** Desplegar recrea: es lo que hace efectiva una configuración editada (RF-08). La sonda de existencia es `listarVolumenesDelContenedor`, que lanza `ContenedorNoEncontradoError` si no hay contenedor. Ver `docs/decisiones-tecnicas.md` DT-15.
+7. **Al retirar un contenedor, elimina sus volúmenes que no sean bind mount.** Qué volúmenes son se le pregunta a Docker (`inspect` → `Mounts` con `Type === "volume"`), nunca se deduce del JSON de la configuración guardada: esa configuración pudo editarse después del despliegue. Un `VolumenEnUsoError` (409) se omite y se informa; un `VolumenNoEncontradoError` (404) se ignora. Nunca abortan la operación.
 
 ## 2. Estrategia de pruebas
 
@@ -253,12 +255,20 @@ it("recolecta metricas cada 5 segundos", async () => {
 
 ## 7. Mapeo de estados (sección 4.2.14)
 
+La tabla vigente es la de `docs/contrato-api.md` 3.9; esta debe mantenerse sincronizada con ella.
+
 | Operación | Origen | Destino éxito | Destino fallo |
 | --- | --- | --- | --- |
-| Desplegar | `configurado` | `en_ejecucion` (vía `desplegando`) | `fallido` |
+| Desplegar | `configurado`, `detenido` o `fallido` | `en_ejecucion` (vía `desplegando`) | `fallido` |
 | Detener | `en_ejecucion` | `detenido` | se mantiene + registro |
-| Reiniciar | `detenido` o `en_ejecucion` | `en_ejecucion` (vía `reiniciando`) | `fallido` |
+| Reiniciar | `detenido`, `en_ejecucion` o `fallido` | `en_ejecucion` (vía `reiniciando`) | `fallido` |
 | Eliminar | cualquiera salvo `eliminado` | `eliminado` | se mantiene + registro |
+
+`fallido` es origen válido de reiniciar y desplegar porque el contenedor puede seguir existiendo (RF-19): `reiniciar` lo reutiliza tal cual, `desplegar` lo recrea con la configuración vigente.
+
+`en_ejecucion` **no** es origen de desplegar: para aplicar cambios hay que detener primero. Es deliberado (DT-15).
+
+Eliminar usa `ServicioRepo.marcarEliminado`, no `actualizarEstado`: además del estado pone `nombreActivo` en `NULL`, que es lo que libera el nombre para reutilizarlo (DT-16).
 
 La actualización del estado y el registro se hacen en una transacción cuando aplica.
 
@@ -272,6 +282,9 @@ La actualización del estado y el registro se hacen en una transacción cuando a
 - [ ] Estado del servicio actualizado tras cada operación.
 - [ ] Operaciones de despliegue invocan al `VerificadorRecursos`.
 - [ ] Parámetros estructurados, sin concatenación.
+- [ ] Desplegar retira el contenedor preexistente antes de crear el nuevo (DT-15).
+- [ ] Los volúmenes a eliminar salen de `inspect`, no de la configuración guardada.
+- [ ] Un volumen en uso por otro contenedor se omite, no hace fallar la operación.
 - [ ] Eventos en log estructurado con campo `evento`.
 - [ ] Pruebas con valores límite (memoria negativa, imagen inexistente, conflicto de nombre).
 - [ ] Todas las pruebas pasan (`npm test`).

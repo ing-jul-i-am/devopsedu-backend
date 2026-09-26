@@ -608,3 +608,148 @@ Etapa 7 (RF-25/26). La forma de las respuestas HTTP no cambia.
 - Derivar el progreso en `GET /mi-ruta` sin persistirlo, o recalcular solo en las escrituras.
   Descartadas: la primera deja desfasado el valor que usaran los reportes, y la segunda muestra
   un porcentaje que no coincide con los estados hasta la siguiente accion del estudiante.
+
+---
+
+## DT-15: el despliegue recrea el contenedor y descarta los volumenes que no son bind mount (RF-08, RF-11, RF-14)
+
+**Fecha:** 2026-09-26
+
+**Contexto:** RF-08 permite editar la configuracion de un servicio, pero al probar la plataforma
+se comprobo que la edicion no tenia ningun efecto real sobre el contenedor. `GestorDocker.desplegar`
+llamaba siempre a `crearContenedor` sin averiguar si el contenedor ya existia. Como el nombre es
+deterministico (`devopsedu-<idServicio>-<nombre>`, ver `cliente-docker.ts`), volver a desplegar un
+servicio `detenido` o `fallido` cuyo contenedor seguia vivo hacia que Docker respondiera 409, el
+gestor marcara el servicio como `fallido` y el estudiante recibiera `NombreContenedorEnUsoError`.
+La unica salida era eliminar el servicio, y eso a su vez chocaba con el nombre bloqueado (ver
+DT-16). En la practica, un estudiante que se equivocaba al configurar no tenia forma de corregirlo.
+
+El contrato (3.9) ya reconocia el problema y recomendaba usar `reiniciar` en ese caso, pero
+`docker restart` reutiliza el contenedor existente: no aplica la configuracion nueva.
+
+**Decision:**
+
+1. **Desplegar recrea.** Antes de crear el contenedor, `desplegar` comprueba si ya existe uno para
+   ese servicio y, en tal caso, lo retira. El contenedor nuevo se construye siempre con la
+   configuracion vigente, que es lo que hace efectiva la edicion de RF-08. La tabla de transiciones
+   no cambia: los origenes validos siguen siendo `configurado`, `detenido` y `fallido`. Un servicio
+   `en_ejecucion` no se recrea; el estudiante debe detenerlo primero, para que el ciclo de vida
+   siga siendo visible y no se destruya por accidente un contenedor en marcha.
+2. **Retirar el contenedor elimina sus volumenes no-bind.** `eliminarContenedor` pasa a invocar
+   `remove({ force: true, v: true })`, que arrastra los volumenes anonimos, y los volumenes
+   nombrados se eliminan despues uno a uno con `eliminarVolumen`. Los bind mounts son directorios
+   del host y no se tocan. `DELETE /api/servicios/:id` aplica la misma limpieza.
+3. **Docker es la fuente de verdad de que hay montado.** La lista de volumenes a eliminar sale de
+   `listarVolumenesDelContenedor`, que inspecciona el contenedor y se queda con los montajes de
+   `Type === "volume"`. No se deduce del JSON de `ConfiguracionServicio.volumenes` porque el
+   estudiante pudo editar la configuracion despues de desplegar: en ese momento la configuracion
+   guardada describe lo que se quiere, no lo que esta montado. Esa misma llamada, al traducir el
+   404 de Docker a `ContenedorNoEncontradoError`, sirve de sonda de existencia y evita una segunda
+   consulta.
+4. **Un volumen en uso no aborta la operacion.** Los nombres de volumen son globales en Docker: un
+   volumen declarado por un servicio puede estar montado por otro contenedor, incluso de otro
+   estudiante. Si `docker volume rm` responde 409 (`VolumenEnUsoError`), el volumen se conserva, se
+   registra el evento `volumen_en_uso_omitido` y su nombre viaja al cliente en `volumenesOmitidos`.
+   Un 404 (`VolumenNoEncontradoError`) se ignora en silencio: es el caso normal de un volumen
+   anonimo que el flag `v` ya arrastro.
+5. **La respuesta informa lo que se perdio.** `desplegar` y `eliminar` devuelven `recreado`,
+   `volumenesEliminados` y `volumenesOmitidos` ademas del ServicioBasico, para que el frontend
+   pueda advertir al estudiante antes de confirmar y mostrar el resultado despues.
+6. **`volumenes[].tipo` es un campo derivado de solo lectura.** La regla de dominio
+   `clasificarVolumen` (`src/dominio/tipo-volumen.ts`) reproduce la inferencia que hace Docker con
+   `HostConfig.Binds`: origen que empieza con `/`, `./`, `../`, `~` o letra de unidad de Windows es
+   `bind`; cualquier otro es `volumen`. Se calcula al responder en lugar de persistirse, de modo
+   que las configuraciones guardadas antes de esta decision tambien lo traen sin migrar datos, y no
+   se acepta como entrada, lo que descarta que lo declarado y lo real se contradigan.
+
+**Consecuencias:** Editar la configuracion y volver a desplegar es ahora el flujo normal para
+corregir o experimentar, que es el proposito educativo de la plataforma. A cambio, **redesplegar
+destruye los datos de los volumenes nombrados**, lo que es irreversible; el contrato lo documenta
+en 3.9.1 y el frontend debe pedir confirmacion explicita. Los bind mounts son la via para conservar
+datos entre redespliegues. `desplegar` ya no devuelve `NombreContenedorEnUsoError` por un
+contenedor propio preexistente, y `eliminar` ya no devuelve `ContenedorNoEncontradoError` cuando el
+servicio nunca se desplego. El riesgo residual es el espacio de nombres global de volumenes: se
+mitiga omitiendo los que Docker declare en uso, pero un volumen que quedo sin montar y que otro
+servicio pensaba reutilizar si se pierde.
+
+**Alternativas consideradas:**
+- Deducir los volumenes a eliminar del JSON de la configuracion vigente, con la misma heuristica de
+  `clasificarVolumen`. No necesitaba llamadas extra a Docker, pero falla justo en el caso que
+  motivo el cambio (configuracion editada despues del despliegue) y no ve los volumenes anonimos
+  que declara la imagen. Descartada.
+- Admitir `en_ejecucion` como origen de `desplegar`, para aplicar cambios en un paso. Descartada
+  por el desarrollador: obligar a detener primero es mas didactico y evita destruir por accidente
+  un contenedor en marcha.
+- Aceptar `tipo` en el cuerpo de la peticion en lugar de derivarlo. Habria permitido declarar un
+  tipo que Docker luego no respeta, obligando a validar la coherencia contra el `origen`.
+  Descartada por redundante.
+- Prefijar los nombres de volumen con el id del servicio (`devopsedu-<id>-<volumen>`) para aislar a
+  cada estudiante. Resolveria de raiz el choque de nombres globales, pero el estudiante dejaria de
+  ver en `docker volume ls` el nombre que escribio, lo que rompe el valor didactico y los criterios
+  de validacion automatica de actividades (DT-10). Descartada.
+
+---
+
+## DT-16: el nombre de un servicio se libera al eliminarlo, via columna nombre_activo (RF-05, RF-14)
+
+**Fecha:** 2026-09-26
+
+**Contexto:** RF-14 especifica que la eliminacion es logica: el servicio se marca `eliminado` y su
+informacion se preserva para el historico. Pero el modelo `Servicio` declaraba
+`@@unique([idUsuario, nombre])` sin considerar el estado, de modo que un servicio eliminado seguia
+reservando su nombre para siempre. Cuando una actividad de aprendizaje exige un nombre de contenedor
+concreto (ver `postman/ruta-modelo/`) y el estudiante se equivoca al crear el servicio, el nombre
+correcto queda inalcanzable de forma permanente: ni puede renombrar (RF-08 solo edita la
+configuracion tecnica) ni puede recrear con el nombre correcto.
+
+Ademas, la violacion de ese unico no estaba traducida: ningun punto del codigo manejaba el error
+`P2002` de Prisma, asi que crear un servicio con nombre repetido caia en el fallback del middleware
+global y respondia **HTTP 500** en lugar de un 409 informativo.
+
+**Decision:**
+
+1. **Columna derivada `nombre_activo`.** `Servicio` incorpora `nombreActivo String?`, que vale lo
+   mismo que `nombre` mientras el servicio esta activo y pasa a `NULL` al eliminarlo. El unico se
+   traslada a `@@unique([idUsuario, nombreActivo])`. PostgreSQL considera distintos entre si los
+   `NULL` dentro de un indice unico, asi que N servicios eliminados del mismo usuario pueden
+   compartir nombre, mientras que dos activos siguen chocando. `nombre` no se toca nunca: el
+   historico del servicio conserva como se llamaba.
+2. **Un unico lugar de escritura.** Solo `ServicioRepo.crearConConfiguracion` (que la asigna) y el
+   metodo nuevo `ServicioRepo.marcarEliminado` (que la anula junto con el estado) escriben
+   `nombreActivo`. `GestorDocker.eliminar` pasa a usar `marcarEliminado` en lugar de
+   `actualizarEstado(id, "eliminado")`, que queda para el resto de la maquina de estados.
+3. **Traduccion de P2002.** `crearConConfiguracion` captura `PrismaClientKnownRequestError` con
+   codigo `P2002` y lanza `NombreServicioDuplicadoError`, que el middleware global traduce a `409`.
+   No se consulta antes de crear: el indice es la unica fuente de verdad, lo que ademas descarta la
+   condicion de carrera entre dos creaciones simultaneas.
+4. **Migracion con backfill.** `20260926093000_libera_nombre_servicio_eliminado` elimina el unico
+   anterior, agrega la columna, copia `nombre` en `nombre_activo` para las filas que no estan
+   eliminadas, y crea el unico nuevo. El backfill se anadio a mano al SQL generado.
+
+**Consecuencias:** El estudiante puede eliminar un servicio mal nombrado y volver a crearlo con el
+nombre que exige la actividad. El nombre duplicado entre servicios activos responde `409` con un
+mensaje en espanol en lugar de un `500`. El coste es una columna redundante que debe mantenerse
+sincronizada con `estado`: si un camino futuro marcara un servicio como eliminado sin pasar por
+`marcarEliminado`, el nombre quedaria reservado en silencio. Las pruebas de integracion del
+repositorio cubren los tres casos (rechazo entre activos, reutilizacion tras eliminar, convivencia
+de varios eliminados) y `tests/fixtures/servicio.factory.ts` deriva `nombreActivo` del estado para
+no sembrar filas que la aplicacion nunca produciria. El nombre del contenedor no se ve afectado:
+incluye el `idServicio`, que siempre es nuevo, asi que reutilizar un nombre no colisiona en Docker.
+
+**Alternativas consideradas:**
+- Indice unico parcial en SQL: `CREATE UNIQUE INDEX ... ON servicio (id_usuario, nombre) WHERE
+  estado <> 'eliminado'`. Es la expresion mas directa de la regla y no necesita columna extra.
+  Descartada porque Prisma no modela indices parciales: el indice viviria solo en el SQL de la
+  migracion y, al generar cualquier migracion futura, el diff entre `schema.prisma` y la shadow
+  database lo veria como un indice sobrante e incluiria un `DROP INDEX` silencioso. El nombre
+  volveria a bloquearse sin que nada avisara.
+- Validar la unicidad solo en `GestorServicios` con una consulta previa, sin restriccion en base de
+  datos. Mas simple, pero pierde la garantia en BD y admite duplicados por condicion de carrera.
+  Descartada por el desarrollador.
+- Renombrar la fila al eliminar (por ejemplo `nombre + " (eliminado #<id>)"`) conservando el unico
+  original. No requiere cambios de esquema, pero altera el dato historico que RF-14 manda preservar
+  y ensucia el detalle y la bitacora del servicio. Descartada.
+- Agregar `PATCH /api/servicios/:id` para renombrar el servicio en sitio. Resolveria el caso de uso
+  original por otra via, pero el nombre del contenedor se deriva del nombre del servicio y no se
+  persiste, de modo que renombrar dejaria huerfano el contenedor anterior sin forma de localizarlo.
+  Descartada para esta etapa; exigiria persistir el nombre de contenedor real.

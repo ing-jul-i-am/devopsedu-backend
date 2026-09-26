@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a5e6f7c8-0002-4b3c-9d4e-devopsedu0002",
     "name": "DevOpsEdu Backend",
-    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) y componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.",
+    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) y componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.\n5. DT-15: 'Desplegar servicio' recrea el contenedor si ya existe, lo que hace efectiva una configuracion editada, y destruye los volumenes que no son bind mount. Para verlo: Crear -> Desplegar -> Detener -> Editar configuracion -> Desplegar (la respuesta trae recreado: true).\n6. DT-16: la carpeta 'Casos de error' cierra con una secuencia de cuatro pasos que demuestra que el nombre de un servicio solo esta reservado mientras esta activo: crear -> repetir (409) -> eliminar -> volver a crear (201).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -262,7 +262,7 @@
                 "servicios"
               ]
             },
-            "description": "RF-05, RF-06: creacion de un servicio con su configuracion inicial. Guarda idServicio automaticamente para los siguientes requests."
+            "description": "RF-05, RF-06: creacion de un servicio con su configuracion inicial. Guarda idServicio automaticamente para los siguientes requests.\n\nDT-16: el nombre debe ser unico entre los servicios ACTIVOS del usuario. Un nombre repetido responde 409. Los servicios eliminados no reservan su nombre."
           }
         },
         {
@@ -307,7 +307,7 @@
                 "{{idServicio}}"
               ]
             },
-            "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue)."
+            "description": "RF-17: detalle del servicio junto con su historico de operaciones (registro_despliegue).\n\nDT-15: cada elemento de configuracion.volumenes trae el campo derivado de solo lectura 'tipo' ('bind' o 'volumen'). El frontend lo usa para advertir que los de tipo 'volumen' se destruyen al redesplegar o eliminar."
           }
         },
         {
@@ -339,7 +339,7 @@
                 "configuracion"
               ]
             },
-            "description": "RF-08: crea un nuevo registro de configuracion (historico 1:N, ver DT-04); no sobrescribe el anterior."
+            "description": "RF-08: crea un nuevo registro de configuracion (historico 1:N, ver DT-04); no sobrescribe el anterior.\n\nDT-15: editar la configuracion NO modifica por si solo el contenedor en marcha. La nueva version queda registrada y surte efecto en el proximo 'Desplegar servicio', que recrea el contenedor. Para un servicio en ejecucion el flujo es: Detener -> Editar -> Desplegar."
           }
         },
         {
@@ -367,8 +367,34 @@
                 "desplegar"
               ]
             },
-            "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend."
-          }
+            "description": "RF-11 / CU-05: verifica recursos (RF-09) y crea + inicia el contenedor via Dockerode. Requiere que exista el motor Docker en el host donde corre el backend.\n\nDT-15: si el contenedor del servicio ya existe (estado detenido o fallido), se elimina y se vuelve a crear con la configuracion vigente. Es lo que hace efectiva una edicion hecha con 'Editar configuracion de servicio'. Al recrear se DESTRUYEN los volumenes que no son bind mount (los que en la respuesta traen tipo: 'volumen') y los volumenes anonimos; los bind mount se conservan. La respuesta incluye recreado, volumenesEliminados y volumenesOmitidos.\n\nUn servicio en_ejecucion no es origen valido: hay que detenerlo primero."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 servicio en ejecucion', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos.estado).to.eql('en_ejecucion');",
+                  "});",
+                  "",
+                  "// DT-15: informa si hubo recreacion y que volumenes se perdieron.",
+                  "pm.test('informa el resultado de la limpieza', function () {",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.property('recreado');",
+                  "    pm.expect(datos.volumenesEliminados).to.be.an('array');",
+                  "    pm.expect(datos.volumenesOmitidos).to.be.an('array');",
+                  "    if (datos.recreado) {",
+                  "        console.log('Contenedor recreado. Volumenes destruidos:', datos.volumenesEliminados);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Consultar metricas del servicio",
@@ -482,8 +508,28 @@
                 "{{idServicio}}"
               ]
             },
-            "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico."
-          }
+            "description": "RF-14: elimina el contenedor (si existe) y marca el servicio como eliminado, preservando su historico.\n\nDT-15: elimina tambien los volumenes del contenedor que no son bind mount. La respuesta incluye volumenesEliminados y volumenesOmitidos (estos ultimos son los que otro contenedor sigue usando y por eso se conservaron).\n\nDT-16: libera el nombre del servicio. Tras eliminarlo se puede volver a crear otro servicio con el mismo nombre, que es la via para corregir un nombre mal escrito cuando una actividad exige uno concreto."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 servicio eliminado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().estado).to.eql('eliminado');",
+                  "});",
+                  "",
+                  "pm.test('informa los volumenes retirados', function () {",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos.volumenesEliminados).to.be.an('array');",
+                  "    pm.expect(datos.volumenesOmitidos).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1308,6 +1354,175 @@
               ]
             },
             "description": "DT-08: el endpoint de reseteo de contrasena esta restringido al rol docente; un estudiante recibe 403."
+          }
+        },
+        {
+          "name": "Crear servicio para demostrar nombre duplicado -> 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 servicio creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.environment.set('idServicioDuplicado', pm.response.json().idServicio);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"demo-nombre-unico\",\n  \"configuracion\": {\n    \"imagenDocker\": \"redis:7-alpine\",\n    \"cpuAsignado\": 0.5,\n    \"memoriaAsignada\": 256,\n    \"almacenamientoAsignado\": 512,\n    \"puertos\": [],\n    \"variablesEntorno\": {},\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
+            },
+            "description": "DT-16: primer paso de la demostracion. Crea un servicio activo llamado 'demo-nombre-unico' y guarda su id para poder eliminarlo en el tercer paso."
+          }
+        },
+        {
+          "name": "Crear servicio con nombre duplicado -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 nombre duplicado entre servicios activos', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().error).to.include('demo-nombre-unico');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"demo-nombre-unico\",\n  \"configuracion\": {\n    \"imagenDocker\": \"redis:7-alpine\",\n    \"cpuAsignado\": 0.5,\n    \"memoriaAsignada\": 256,\n    \"almacenamientoAsignado\": 512,\n    \"puertos\": [],\n    \"variablesEntorno\": {},\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
+            },
+            "description": "DT-16: segundo paso. Repetir el mismo nombre mientras el primer servicio sigue activo responde 409 con NombreServicioDuplicadoError. Antes de DT-16 esto provocaba un 500, porque la violacion del unico de Prisma (P2002) no estaba traducida (RNF-12)."
+          }
+        },
+        {
+          "name": "Eliminar el servicio para liberar el nombre -> 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 servicio eliminado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().estado).to.eql('eliminado');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicios/{{idServicioDuplicado}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios",
+                "{{idServicioDuplicado}}"
+              ]
+            },
+            "description": "DT-16: tercer paso. Al eliminar el servicio su nombre deja de estar reservado."
+          }
+        },
+        {
+          "name": "Volver a crear con el nombre liberado -> 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 el nombre volvio a estar disponible', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(pm.response.json().nombre).to.eql('demo-nombre-unico');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"demo-nombre-unico\",\n  \"configuracion\": {\n    \"imagenDocker\": \"redis:7-alpine\",\n    \"cpuAsignado\": 0.5,\n    \"memoriaAsignada\": 256,\n    \"almacenamientoAsignado\": 512,\n    \"puertos\": [],\n    \"variablesEntorno\": {},\n    \"volumenes\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicios"
+              ]
+            },
+            "description": "DT-16: cuarto paso. El mismo nombre que antes daba 409 ahora se acepta, porque el servicio que lo ocupaba esta eliminado. Es la via para corregir un nombre mal escrito cuando una actividad de aprendizaje exige un nombre de contenedor concreto."
           }
         }
       ]
