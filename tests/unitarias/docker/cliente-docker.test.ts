@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { dockerMock, contenedorMock } = vi.hoisted(() => {
+const { dockerMock, contenedorMock, volumenMock } = vi.hoisted(() => {
   const contenedorMock = {
     id: "contenedor-abc",
     start: vi.fn(),
@@ -15,11 +15,15 @@ const { dockerMock, contenedorMock } = vi.hoisted(() => {
     stats: vi.fn(),
     inspect: vi.fn(),
   };
+  const volumenMock = {
+    remove: vi.fn(),
+  };
   const dockerMock = {
     createContainer: vi.fn(),
     getContainer: vi.fn(() => contenedorMock),
+    getVolume: vi.fn(() => volumenMock),
   };
-  return { dockerMock, contenedorMock };
+  return { dockerMock, contenedorMock, volumenMock };
 });
 
 vi.mock("dockerode", () => ({ default: vi.fn(() => dockerMock) }));
@@ -29,6 +33,8 @@ import {
   detenerContenedor,
   reiniciarContenedor,
   eliminarContenedor,
+  eliminarVolumen,
+  listarVolumenesDelContenedor,
   obtenerEstadisticas,
   obtenerEstadoContenedor,
   nombreContenedor,
@@ -37,6 +43,8 @@ import { ImagenDockerNoDisponibleError } from "@/dominio/errores/imagen-docker-n
 import { NombreContenedorEnUsoError } from "@/dominio/errores/nombre-contenedor-en-uso-error.js";
 import { ContenedorNoEncontradoError } from "@/dominio/errores/contenedor-no-encontrado-error.js";
 import { MotorDockerNoDisponibleError } from "@/dominio/errores/motor-docker-no-disponible-error.js";
+import { VolumenEnUsoError } from "@/dominio/errores/volumen-en-uso-error.js";
+import { VolumenNoEncontradoError } from "@/dominio/errores/volumen-no-encontrado-error.js";
 
 function paramsBase() {
   return {
@@ -55,6 +63,7 @@ describe("cliente-docker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dockerMock.getContainer.mockReturnValue(contenedorMock);
+    dockerMock.getVolume.mockReturnValue(volumenMock);
   });
 
   describe("nombreContenedor", () => {
@@ -136,10 +145,93 @@ describe("cliente-docker", () => {
       expect(contenedorMock.restart).toHaveBeenCalled();
     });
 
-    it("eliminarContenedor invoca remove con force", async () => {
+    // El flag "v" arrastra los volumenes anonimos que Docker crea por instruccion de la imagen;
+    // los volumenes nombrados no los toca y se eliminan aparte (DT-15).
+    it("eliminarContenedor invoca remove con force y arrastra los volumenes anonimos", async () => {
       contenedorMock.remove.mockResolvedValue(undefined);
       await eliminarContenedor("x");
-      expect(contenedorMock.remove).toHaveBeenCalledWith({ force: true });
+      expect(contenedorMock.remove).toHaveBeenCalledWith({
+        force: true,
+        v: true,
+      });
+    });
+  });
+
+  describe("listarVolumenesDelContenedor", () => {
+    it("devuelve solo los montajes de tipo volumen y descarta los bind mount", async () => {
+      // Arrange
+      contenedorMock.inspect.mockResolvedValue({
+        State: { Running: true, Status: "running" },
+        Mounts: [
+          { Type: "volume", Name: "datos-redis", Destination: "/data" },
+          { Type: "bind", Source: "/datos/pg", Destination: "/var/lib/pg" },
+          { Type: "volume", Name: "a1b2c3", Destination: "/tmp/anonimo" },
+        ],
+      });
+
+      // Act
+      const volumenes = await listarVolumenesDelContenedor("x");
+
+      // Assert
+      expect(volumenes).toEqual(["datos-redis", "a1b2c3"]);
+    });
+
+    it("devuelve una lista vacia cuando el contenedor no declara montajes", async () => {
+      // Arrange
+      contenedorMock.inspect.mockResolvedValue({
+        State: { Running: true, Status: "running" },
+      });
+
+      // Act
+      const volumenes = await listarVolumenesDelContenedor("x");
+
+      // Assert
+      expect(volumenes).toEqual([]);
+    });
+
+    // Sirve tambien como sonda de existencia: el gestor distingue asi si debe recrear o crear.
+    it("traduce un error 404 a ContenedorNoEncontradoError", async () => {
+      contenedorMock.inspect.mockRejectedValue({ statusCode: 404 });
+      await expect(listarVolumenesDelContenedor("x")).rejects.toBeInstanceOf(
+        ContenedorNoEncontradoError
+      );
+    });
+  });
+
+  describe("eliminarVolumen", () => {
+    it("invoca remove sobre el volumen por su nombre", async () => {
+      // Arrange
+      volumenMock.remove.mockResolvedValue(undefined);
+
+      // Act
+      await eliminarVolumen("datos-redis");
+
+      // Assert
+      expect(dockerMock.getVolume).toHaveBeenCalledWith("datos-redis");
+      expect(volumenMock.remove).toHaveBeenCalled();
+    });
+
+    it("traduce un error 404 a VolumenNoEncontradoError", async () => {
+      volumenMock.remove.mockRejectedValue({ statusCode: 404 });
+      await expect(eliminarVolumen("datos-redis")).rejects.toBeInstanceOf(
+        VolumenNoEncontradoError
+      );
+    });
+
+    // Docker responde 409 cuando otro contenedor sigue montando el volumen. El nombre de un
+    // volumen es global, asi que puede pertenecer a un servicio distinto (DT-15).
+    it("traduce un error 409 a VolumenEnUsoError", async () => {
+      volumenMock.remove.mockRejectedValue({ statusCode: 409 });
+      await expect(eliminarVolumen("datos-redis")).rejects.toBeInstanceOf(
+        VolumenEnUsoError
+      );
+    });
+
+    it("traduce un fallo de conexion al socket a MotorDockerNoDisponibleError", async () => {
+      volumenMock.remove.mockRejectedValue({ code: "ECONNREFUSED" });
+      await expect(eliminarVolumen("datos-redis")).rejects.toBeInstanceOf(
+        MotorDockerNoDisponibleError
+      );
     });
   });
 

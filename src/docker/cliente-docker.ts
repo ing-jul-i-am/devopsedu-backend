@@ -10,6 +10,8 @@ import { ImagenDockerNoDisponibleError } from "../dominio/errores/imagen-docker-
 import { NombreContenedorEnUsoError } from "../dominio/errores/nombre-contenedor-en-uso-error.js";
 import { ContenedorNoEncontradoError } from "../dominio/errores/contenedor-no-encontrado-error.js";
 import { MotorDockerNoDisponibleError } from "../dominio/errores/motor-docker-no-disponible-error.js";
+import { VolumenEnUsoError } from "../dominio/errores/volumen-en-uso-error.js";
+import { VolumenNoEncontradoError } from "../dominio/errores/volumen-no-encontrado-error.js";
 
 const docker = new Docker();
 
@@ -83,10 +85,39 @@ export async function reiniciarContenedor(idOnombre: string): Promise<void> {
   await ejecutarOperacion(() => docker.getContainer(idOnombre).restart());
 }
 
+// El flag "v" arrastra los volumenes anonimos que la imagen declara con VOLUME. Los volumenes
+// nombrados Docker nunca los borra junto al contenedor: se eliminan aparte con eliminarVolumen
+// a partir de lo que reporte listarVolumenesDelContenedor (ver DT-15).
 export async function eliminarContenedor(idOnombre: string): Promise<void> {
   await ejecutarOperacion(() =>
-    docker.getContainer(idOnombre).remove({ force: true })
+    docker.getContainer(idOnombre).remove({ force: true, v: true })
   );
+}
+
+// Montajes de tipo volumen (nombrados y anonimos) que el contenedor tiene realmente asociados.
+// Se consulta a Docker en lugar de deducirlo del JSON de la configuracion porque esa
+// configuracion puede haberse editado despues del despliegue y ya no describir lo montado.
+// Al traducir el 404 a ContenedorNoEncontradoError sirve tambien como sonda de existencia.
+export async function listarVolumenesDelContenedor(
+  idOnombre: string
+): Promise<string[]> {
+  try {
+    const inspeccion = await docker.getContainer(idOnombre).inspect();
+    return (inspeccion.Mounts ?? [])
+      .filter((montaje) => montaje.Type === "volume")
+      .map((montaje) => montaje.Name)
+      .filter((nombre): nombre is string => Boolean(nombre));
+  } catch (error) {
+    throw traducirErrorOperacion(error);
+  }
+}
+
+export async function eliminarVolumen(nombre: string): Promise<void> {
+  try {
+    await docker.getVolume(nombre).remove();
+  } catch (error) {
+    throw traducirErrorVolumen(error, nombre);
+  }
 }
 
 export async function obtenerEstadisticas(
@@ -178,6 +209,21 @@ function traducirErrorCreacion(error: unknown, imagen: string): Error {
   }
   if (statusCode === 409) {
     return new NombreContenedorEnUsoError();
+  }
+  return error instanceof Error ? error : new Error("Error del motor Docker");
+}
+
+function traducirErrorVolumen(error: unknown, volumen: string): Error {
+  logger.error({ error, evento: "docker_eliminar_volumen_falla", volumen });
+  if (esErrorConexion(error)) {
+    return new MotorDockerNoDisponibleError();
+  }
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  if (statusCode === 404) {
+    return new VolumenNoEncontradoError(volumen);
+  }
+  if (statusCode === 409) {
+    return new VolumenEnUsoError(volumen);
   }
   return error instanceof Error ? error : new Error("Error del motor Docker");
 }
