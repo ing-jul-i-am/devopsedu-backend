@@ -2,17 +2,23 @@
 // Controladores HTTP de servicios: creacion, edicion, catalogo, panel, detalle y operaciones de
 // control (desplegar/detener/reiniciar/eliminar). Delegan la logica a los gestores; requieren
 // autenticacion previa (req.usuario).
-// Cubre: RF-05, RF-06, RF-07, RF-11, RF-12, RF-13, RF-14, RF-16, RF-17 — CU-03, CU-05
+// Desplegar y eliminar informan ademas si hubo recreacion y que volumenes se perdieron, para que
+// el frontend pueda advertirlo (ver docs/decisiones-tecnicas.md DT-15).
+// Cubre: RF-05, RF-06, RF-07, RF-08, RF-11, RF-12, RF-13, RF-14, RF-16, RF-17 — CU-03, CU-05
 
 import type { RequestHandler, Request } from "express";
 import type { Servicio, Metrica } from "@prisma/client";
 import type { GestorServicios } from "../../../servicios-aplicacion/gestor-servicios.js";
-import type { GestorDocker } from "../../../servicios-aplicacion/gestor-docker.js";
+import type {
+  GestorDocker,
+  ResultadoOperacionDocker,
+} from "../../../servicios-aplicacion/gestor-docker.js";
 import type { ServicioConConfiguraciones } from "../../../repositorios/servicio-repo.js";
 import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ServicioNoEncontradoError } from "../../../dominio/errores/servicio-no-encontrado-error.js";
 import { CATALOGO_IMAGENES } from "../../../dominio/catalogo-imagenes.js";
+import { clasificarVolumen } from "../../../dominio/tipo-volumen.js";
 import { metricasQuerySchema } from "../../validadores/servicios/metricas.validador.js";
 
 function usuarioDe(req: Request): UsuarioAutenticado {
@@ -28,6 +34,22 @@ function idServicioDe(req: Request): number {
     throw new ServicioNoEncontradoError();
   }
   return id;
+}
+
+// El tipo de volumen es un campo derivado de solo lectura: se calcula al responder en lugar de
+// persistirse, de modo que las configuraciones guardadas antes de DT-15 tambien lo traen. Permite
+// al frontend advertir que al recrear el contenedor se pierden los volumenes no-bind.
+function aVolumenesRespuesta(volumenes: unknown) {
+  if (!Array.isArray(volumenes)) {
+    return volumenes;
+  }
+  return volumenes.map((volumen) => {
+    const origen = (volumen as { origen?: unknown }).origen;
+    if (typeof origen !== "string") {
+      return volumen;
+    }
+    return { ...(volumen as object), tipo: clasificarVolumen(origen) };
+  });
 }
 
 function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
@@ -46,7 +68,7 @@ function aServicioRespuesta(servicio: ServicioConConfiguraciones) {
           almacenamientoAsignado: vigente.almacenamientoAsignado,
           puertos: vigente.puertos,
           variablesEntorno: vigente.variablesEntorno,
-          volumenes: vigente.volumenes,
+          volumenes: aVolumenesRespuesta(vigente.volumenes),
         }
       : null,
   };
@@ -181,6 +203,31 @@ export function crearControladoresServicios(
     };
   };
 
+  // Desplegar y eliminar retiran el contenedor anterior, asi que informan ademas si hubo
+  // recreacion y que volumenes se destruyeron o se omitieron por estar en uso (DT-15).
+  const operacionConLimpieza = (
+    accion: (
+      idUsuario: number,
+      idServicio: number
+    ) => Promise<ResultadoOperacionDocker>
+  ): RequestHandler => {
+    return async (req, res, next) => {
+      try {
+        const usuario = usuarioDe(req);
+        const idServicio = idServicioDe(req);
+        const resultado = await accion(usuario.idUsuario, idServicio);
+        res.status(200).json({
+          ...aServicioBasico(resultado.servicio),
+          recreado: resultado.recreado,
+          volumenesEliminados: resultado.volumenesEliminados,
+          volumenesOmitidos: resultado.volumenesOmitidos,
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+  };
+
   return {
     crear,
     editarConfiguracion,
@@ -188,9 +235,9 @@ export function crearControladoresServicios(
     listar,
     detalle,
     metricas,
-    desplegar: operacion((u, s) => gestorDocker.desplegar(u, s)),
+    desplegar: operacionConLimpieza((u, s) => gestorDocker.desplegar(u, s)),
     detener: operacion((u, s) => gestorDocker.detener(u, s)),
     reiniciar: operacion((u, s) => gestorDocker.reiniciar(u, s)),
-    eliminar: operacion((u, s) => gestorDocker.eliminar(u, s)),
+    eliminar: operacionConLimpieza((u, s) => gestorDocker.eliminar(u, s)),
   };
 }

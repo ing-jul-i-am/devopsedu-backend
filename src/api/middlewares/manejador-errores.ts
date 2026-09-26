@@ -5,6 +5,7 @@
 import type { ErrorRequestHandler } from "express";
 import { CredencialesInvalidasError } from "../../dominio/errores/credenciales-invalidas-error.js";
 import { CorreoYaRegistradoError } from "../../dominio/errores/correo-ya-registrado-error.js";
+import { NombreServicioDuplicadoError } from "../../dominio/errores/nombre-servicio-duplicado-error.js";
 import { TokenInvalidoError } from "../../dominio/errores/token-invalido-error.js";
 import { PermisoDenegadoError } from "../../dominio/errores/permiso-denegado-error.js";
 import { RolNoDisponibleError } from "../../dominio/errores/rol-no-disponible-error.js";
@@ -18,6 +19,8 @@ import { ImagenDockerNoDisponibleError } from "../../dominio/errores/imagen-dock
 import { NombreContenedorEnUsoError } from "../../dominio/errores/nombre-contenedor-en-uso-error.js";
 import { ContenedorNoEncontradoError } from "../../dominio/errores/contenedor-no-encontrado-error.js";
 import { MotorDockerNoDisponibleError } from "../../dominio/errores/motor-docker-no-disponible-error.js";
+import { VolumenEnUsoError } from "../../dominio/errores/volumen-en-uso-error.js";
+import { VolumenNoEncontradoError } from "../../dominio/errores/volumen-no-encontrado-error.js";
 import { TipoArchivoNoPermitidoError } from "../../dominio/errores/tipo-archivo-no-permitido-error.js";
 import { ArchivoDemasiadoGrandeError } from "../../dominio/errores/archivo-demasiado-grande-error.js";
 import { ArchivoNoProporcionadoError } from "../../dominio/errores/archivo-no-proporcionado-error.js";
@@ -66,6 +69,7 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
 
   if (
     err instanceof CorreoYaRegistradoError ||
+    err instanceof NombreServicioDuplicadoError ||
     err instanceof EvaluacionYaExisteError ||
     err instanceof IntentosAgotadosError ||
     err instanceof EvaluacionYaAprobadaError
@@ -130,6 +134,20 @@ export const manejadorErrores: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof ContenedorNoEncontradoError) {
     logger.warn({ evento: "contenedor_no_encontrado", ruta: req.path });
     res.status(404).json({ error: err.message });
+    return;
+  }
+
+  // GestorDocker absorbe estos dos durante la limpieza de volumenes (DT-15); el mapeo existe
+  // para que ninguna ruta futura los deje caer al 500 generico.
+  if (err instanceof VolumenNoEncontradoError) {
+    logger.warn({ evento: "volumen_no_encontrado", ruta: req.path });
+    res.status(404).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof VolumenEnUsoError) {
+    logger.warn({ evento: "volumen_en_uso", ruta: req.path });
+    res.status(409).json({ error: err.message });
     return;
   }
 

@@ -15,8 +15,12 @@ vi.mock("@/docker/cliente-docker.js", () => ({
   detenerContenedor: vi.fn().mockResolvedValue(undefined),
   reiniciarContenedor: vi.fn().mockResolvedValue(undefined),
   eliminarContenedor: vi.fn().mockResolvedValue(undefined),
+  eliminarVolumen: vi.fn().mockResolvedValue(undefined),
+  listarVolumenesDelContenedor: vi.fn(),
 }));
 
+import * as clienteDocker from "@/docker/cliente-docker.js";
+import { ContenedorNoEncontradoError } from "@/dominio/errores/contenedor-no-encontrado-error.js";
 import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
@@ -40,6 +44,11 @@ describe("Control, panel y detalle de servicios", () => {
   beforeEach(async () => {
     await limpiarBd();
     await crearRolEnBd({ nombre: "estudiante" });
+    // setup-cada-test restaura los mocks tras cada test, asi que la implementacion por defecto
+    // se declara aqui. Estas pruebas no ejercitan la recreacion: el contenedor nunca preexiste.
+    vi.mocked(clienteDocker.listarVolumenesDelContenedor).mockRejectedValue(
+      new ContenedorNoEncontradoError()
+    );
   });
 
   afterAll(async () => {

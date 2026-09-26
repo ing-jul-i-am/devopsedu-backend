@@ -1,9 +1,12 @@
 // tests/integracion/repositorios/servicio-repo.test.ts
 // Pruebas de integracion del repositorio de servicios contra la base de pruebas.
-// Cubre: RF-05, RF-08, RF-19
+// Incluye la unicidad del nombre entre servicios activos y su liberacion al marcar el servicio
+// como eliminado (ver docs/decisiones-tecnicas.md DT-16).
+// Cubre: RF-05, RF-08, RF-14, RF-19
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { ServicioRepo } from "@/repositorios/servicio-repo.js";
+import { NombreServicioDuplicadoError } from "@/dominio/errores/nombre-servicio-duplicado-error.js";
 import { prismaTest } from "../../ayudas/prisma-test.js";
 import { limpiarBd } from "../../ayudas/limpiar-bd.js";
 import { crearUsuarioEnBd } from "../../fixtures/usuario.factory.js";
@@ -51,7 +54,7 @@ describe("ServicioRepo", () => {
       expect(servicio.configuraciones[0]?.imagenDocker).toBe("postgres:16-alpine");
     });
 
-    it("rechaza dos servicios con el mismo nombre para el mismo usuario", async () => {
+    it("rechaza dos servicios activos con el mismo nombre para el mismo usuario", async () => {
       // Arrange
       const usuario = await crearUsuarioEnBd();
       const datos = {
@@ -62,7 +65,91 @@ describe("ServicioRepo", () => {
       await repo.crearConConfiguracion(datos);
 
       // Act + Assert
-      await expect(repo.crearConConfiguracion(datos)).rejects.toThrow();
+      await expect(repo.crearConConfiguracion(datos)).rejects.toBeInstanceOf(
+        NombreServicioDuplicadoError
+      );
+    });
+
+    it("permite el mismo nombre a usuarios distintos", async () => {
+      // Arrange
+      const uno = await crearUsuarioEnBd({ correo: "uno@devopsedu.local" });
+      const otro = await crearUsuarioEnBd({ correo: "otro@devopsedu.local" });
+      await repo.crearConConfiguracion({
+        idUsuario: uno.idUsuario,
+        nombre: "compartido",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const segundo = await repo.crearConConfiguracion({
+        idUsuario: otro.idUsuario,
+        nombre: "compartido",
+        configuracion: configValida(),
+      });
+
+      // Assert
+      expect(segundo.nombre).toBe("compartido");
+    });
+  });
+
+  // DT-16: el nombre solo esta reservado mientras el servicio sigue activo.
+  describe("marcarEliminado", () => {
+    it("libera el nombre para que el estudiante pueda volver a usarlo", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const datos = {
+        idUsuario: usuario.idUsuario,
+        nombre: "servidor-web",
+        configuracion: configValida(),
+      };
+      const original = await repo.crearConConfiguracion(datos);
+      await repo.marcarEliminado(original.idServicio);
+
+      // Act
+      const reemplazo = await repo.crearConConfiguracion(datos);
+
+      // Assert
+      expect(reemplazo.idServicio).not.toBe(original.idServicio);
+      expect(reemplazo.nombre).toBe("servidor-web");
+    });
+
+    it("deja el servicio en estado eliminado conservando su nombre original", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const servicio = await repo.crearConConfiguracion({
+        idUsuario: usuario.idUsuario,
+        nombre: "servidor-web",
+        configuracion: configValida(),
+      });
+
+      // Act
+      const eliminado = await repo.marcarEliminado(servicio.idServicio);
+
+      // Assert
+      expect(eliminado.estado).toBe("eliminado");
+      expect(eliminado.nombre).toBe("servidor-web");
+    });
+
+    it("permite que convivan varios servicios eliminados con el mismo nombre", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const datos = {
+        idUsuario: usuario.idUsuario,
+        nombre: "repetido",
+        configuracion: configValida(),
+      };
+      const primero = await repo.crearConConfiguracion(datos);
+      await repo.marcarEliminado(primero.idServicio);
+      const segundo = await repo.crearConConfiguracion(datos);
+
+      // Act
+      await repo.marcarEliminado(segundo.idServicio);
+
+      // Assert
+      const eliminados = await prismaTest.servicio.count({
+        where: { nombre: "repetido", estado: "eliminado" },
+      });
+      expect(eliminados).toBe(2);
     });
   });
 

@@ -61,6 +61,12 @@ model Sesion {
 model Servicio {
   idServicio    Int      @id @default(autoincrement()) @map("id_servicio")
   nombre        String   @db.VarChar(120)
+  // Copia de "nombre" mientras el servicio sigue activo; pasa a NULL al eliminarlo. PostgreSQL
+  // considera distintos entre si los NULL dentro de un indice unico, de modo que el nombre queda
+  // reservado solo entre los servicios vivos y el estudiante puede reutilizarlo despues de
+  // eliminar (RF-14). Columna derivada: solo la escriben ServicioRepo.crearConConfiguracion y
+  // ServicioRepo.marcarEliminado (ver docs/decisiones-tecnicas.md DT-16).
+  nombreActivo  String?  @map("nombre_activo") @db.VarChar(120)
   descripcion   String?  @db.Text
   estado        String   @db.VarChar(20)
   fechaCreacion DateTime @default(now()) @map("fecha_creacion")
@@ -71,7 +77,7 @@ model Servicio {
   registrosDespliegue RegistroDespliegue[]
   metricas            Metrica[]
 
-  @@unique([idUsuario, nombre])
+  @@unique([idUsuario, nombreActivo])
   @@index([estado])
   @@map("servicio")
 }

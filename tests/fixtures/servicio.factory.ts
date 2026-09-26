@@ -1,6 +1,8 @@
 // tests/fixtures/servicio.factory.ts
 // Funcion de fabrica para crear servicios (con su configuracion inicial) en la base de pruebas.
 // Si no se indica idUsuario, crea un usuario por defecto para satisfacer la llave foranea.
+// nombreActivo se deriva del estado igual que lo hace ServicioRepo, para no sembrar filas que la
+// aplicacion nunca produciria (ver docs/decisiones-tecnicas.md DT-16).
 
 import { prismaTest } from "../ayudas/prisma-test.js";
 import { crearUsuarioEnBd } from "./usuario.factory.js";
@@ -28,12 +30,15 @@ let secuenciaServicio = 0;
 export async function crearServicioEnBd(parciales: ParcialesServicio = {}) {
   const idUsuario = parciales.idUsuario ?? (await crearUsuarioEnBd()).idUsuario;
   const cfg = parciales.configuracion ?? {};
+  const nombre = parciales.nombre ?? `servicio-prueba-${++secuenciaServicio}`;
+  const estado = parciales.estado ?? "configurado";
 
   return prismaTest.servicio.create({
     data: {
-      nombre: parciales.nombre ?? `servicio-prueba-${++secuenciaServicio}`,
+      nombre,
+      nombreActivo: estado === "eliminado" ? null : nombre,
       descripcion: parciales.descripcion ?? null,
-      estado: parciales.estado ?? "configurado",
+      estado,
       idUsuario,
       configuraciones: {
         create: {
