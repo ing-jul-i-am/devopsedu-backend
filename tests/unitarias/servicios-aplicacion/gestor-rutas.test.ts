@@ -19,7 +19,7 @@ describe("GestorRutas.asignar", () => {
     // Arrange
     const dep = crearDependenciasMock();
     dep.usuarioRepo.buscarPorId.mockResolvedValue(null);
-    const gestor = new GestorRutas(dep as any);
+    const gestor = new GestorRutas(dep as never);
 
     // Act
     const intento = gestor.asignar(999, [1, 2]);
@@ -36,7 +36,7 @@ describe("GestorRutas.asignar", () => {
     dep.moduloRepo.buscarPorId.mockImplementation((id: number) =>
       Promise.resolve(id === 1 ? { idModulo: 1 } : null)
     );
-    const gestor = new GestorRutas(dep as any);
+    const gestor = new GestorRutas(dep as never);
 
     // Act
     const intento = gestor.asignar(1, [1, 2]);
@@ -57,7 +57,7 @@ describe("GestorRutas.asignar", () => {
       progreso: 0,
       rutaModulos: [{ idModulo: 2, ordenSecuencia: 1 }, { idModulo: 1, ordenSecuencia: 2 }],
     });
-    const gestor = new GestorRutas(dep as any);
+    const gestor = new GestorRutas(dep as never);
 
     // Act
     const ruta = await gestor.asignar(1, [2, 1]);

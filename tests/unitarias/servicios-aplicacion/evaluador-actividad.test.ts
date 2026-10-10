@@ -62,7 +62,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
     // Arrange
     const dep = crearDependenciasMock();
     dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(null);
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");
@@ -77,7 +77,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
     dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(rutaConUnModulo());
     dep.actividadRepo.listarPorModulo.mockResolvedValue([actividad()]);
     dep.resultadoRepo.existePorUsuarioYActividad.mockResolvedValue(true);
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");
@@ -94,7 +94,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
       actividad({ criteriosValidacion: { operacion: "detener" } }),
     ]);
     dep.resultadoRepo.existePorUsuarioYActividad.mockResolvedValue(false);
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");
@@ -119,7 +119,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
     dep.servicioRepo.buscarPorIdConConfiguracionVigente.mockResolvedValue(
       servicioConConfiguracion({ volumenes: [] })
     );
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");
@@ -148,7 +148,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
       servicioConConfiguracion({ volumenes: [{ origen: "a", destino: "b", modo: "rw" }] })
     );
     dep.registroRepo.contarPorServicioYOperacion.mockResolvedValue(2);
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");
@@ -180,7 +180,7 @@ describe("EvaluadorActividad.evaluarTrasOperacion", () => {
       servicioConConfiguracion()
     );
     dep.registroRepo.contarPorServicioYOperacion.mockResolvedValue(1);
-    const evaluador = new EvaluadorActividad(dep as any);
+    const evaluador = new EvaluadorActividad(dep as never);
 
     // Act
     await evaluador.evaluarTrasOperacion(1, 7, "desplegar");

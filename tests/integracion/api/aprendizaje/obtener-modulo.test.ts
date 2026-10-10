@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import request from "supertest";
+import type { Prisma } from "@prisma/client";
 import { construirApp } from "../../../ayudas/construir-app.js";
 import { limpiarBd } from "../../../ayudas/limpiar-bd.js";
 import { prismaTest } from "../../../ayudas/prisma-test.js";
@@ -71,7 +72,7 @@ describe("GET /api/aprendizaje/modulos/:idModulo", () => {
         contenido: [
           bloqueTexto(),
           bloqueActividad({ idActividad: actividad.idActividad }),
-        ] as any,
+        ] as unknown as Prisma.InputJsonValue,
       },
     });
     await crearUsuarioConRol(ESTUDIANTE, "estudiante");

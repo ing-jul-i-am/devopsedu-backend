@@ -34,7 +34,7 @@ describe("GestorModulos", () => {
       const dep = crearDependenciasMock();
       const datos = datosModuloValidos();
       dep.moduloRepo.crear.mockResolvedValue({ idModulo: 1, ...datos });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const modulo = await gestor.crear(datos);
@@ -50,7 +50,7 @@ describe("GestorModulos", () => {
       // Arrange
       const dep = crearDependenciasMock();
       dep.moduloRepo.listarTodos.mockResolvedValue([]);
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       await gestor.listarTodos();
@@ -68,7 +68,7 @@ describe("GestorModulos", () => {
         idModulo: 1,
         ...datosModuloValidos(),
       });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const modulo = await gestor.obtenerPorId(1);
@@ -82,7 +82,7 @@ describe("GestorModulos", () => {
       // Arrange
       const dep = crearDependenciasMock();
       dep.moduloRepo.buscarPorId.mockResolvedValue(null);
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const intento = gestor.obtenerPorId(999);
@@ -104,7 +104,7 @@ describe("GestorModulos", () => {
         idModulo: 1,
         ...datosModuloValidos({ nombre: "Redes en Docker", orden: 2 }),
       });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const modulo = await gestor.editar(1, { nombre: "Redes en Docker", orden: 2 });
@@ -121,7 +121,7 @@ describe("GestorModulos", () => {
       // Arrange
       const dep = crearDependenciasMock();
       dep.moduloRepo.buscarPorId.mockResolvedValue(null);
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const intento = gestor.editar(999, { nombre: "No existe" });
@@ -148,7 +148,7 @@ describe("GestorModulos", () => {
         orden: 1,
         idModulo: 1,
       });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const actividad = await gestor.crearActividad(1, {
@@ -171,7 +171,7 @@ describe("GestorModulos", () => {
       // Arrange
       const dep = crearDependenciasMock();
       dep.moduloRepo.buscarPorId.mockResolvedValue(null);
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const intento = gestor.crearActividad(999, {
@@ -204,7 +204,7 @@ describe("GestorModulos", () => {
         fechaDisponible,
         idModulo: 1,
       });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const evaluacion = await gestor.crearEvaluacion(1, {
@@ -227,7 +227,7 @@ describe("GestorModulos", () => {
       // Arrange
       const dep = crearDependenciasMock();
       dep.moduloRepo.buscarPorId.mockResolvedValue(null);
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const intento = gestor.crearEvaluacion(999, {
@@ -249,7 +249,7 @@ describe("GestorModulos", () => {
         ...datosModuloValidos(),
       });
       dep.evaluacionRepo.buscarPorModulo.mockResolvedValue({ idEvaluacion: 5 });
-      const gestor = new GestorModulos(dep as any);
+      const gestor = new GestorModulos(dep as never);
 
       // Act
       const intento = gestor.crearEvaluacion(1, {

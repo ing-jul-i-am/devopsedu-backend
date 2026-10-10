@@ -32,7 +32,7 @@ function crearDependenciasMock() {
 }
 
 function crearGestor(dep: ReturnType<typeof crearDependenciasMock>) {
-  return new GestorAprendizaje(dep as any);
+  return new GestorAprendizaje(dep as never);
 }
 
 function rutaConModulo(

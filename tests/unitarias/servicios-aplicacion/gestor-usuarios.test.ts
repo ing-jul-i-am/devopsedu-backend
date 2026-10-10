@@ -19,8 +19,8 @@ describe("GestorUsuarios.resetearContrasena", () => {
       cifrar: vi.fn().mockResolvedValue("hash_nuevo"),
     };
     const gestor = new GestorUsuarios({
-      usuarioRepo: usuarioRepoMock as any,
-      cifrador: cifradorMock as any,
+      usuarioRepo: usuarioRepoMock as never,
+      cifrador: cifradorMock as never,
     });
 
     // Act
@@ -42,8 +42,8 @@ describe("GestorUsuarios.resetearContrasena", () => {
     };
     const cifradorMock = { cifrar: vi.fn() };
     const gestor = new GestorUsuarios({
-      usuarioRepo: usuarioRepoMock as any,
-      cifrador: cifradorMock as any,
+      usuarioRepo: usuarioRepoMock as never,
+      cifrador: cifradorMock as never,
     });
 
     // Act
