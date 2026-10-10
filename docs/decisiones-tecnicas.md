@@ -850,3 +850,47 @@ exactamente con el `volumenesEliminados` del redespliegue siguiente.
   frontend lo pida. Mantiene barato el detalle normal, pero introduce dos formas de respuesta que
   documentar y mantener, y el coste que ahorra es un `inspect`. Descartada por el desarrollador.
 - Exponerlo tambien en el panel. Descartada por el coste de N `inspect` en cada carga.
+
+## DT-18: estado de completado por actividad en el contenido del modulo (RF-23)
+
+**Fecha:** 2026-10-10
+
+**Contexto:** El frontend necesita pintar cada actividad practica dentro de la lectura de un
+modulo como pendiente o completada. `GET /api/aprendizaje/modulos/:idModulo` (6.1b) solo
+enriquecia los bloques `actividad` con su `descripcion`; el unico indicio de avance era el
+`estado` agregado del modulo en `mi-ruta` (DT-13), que no distingue entre actividades.
+
+**Decision:** Cada bloque `actividad` agrega `completada: boolean` y
+`fechaCompletada: string | null`:
+
+1. **Criterio de completado:** existe un `Resultado` del estudiante autenticado con ese
+   `idActividad`. Es el mismo criterio que usan `EvaluadorActividad`, `CalculadorProgreso` y
+   `calcularEstadoModulo` (DT-10, DT-13, DT-14), de modo que la vista por actividad y el `estado`
+   del modulo en `mi-ruta` no pueden contradecirse. `EvaluadorActividad` solo crea el `Resultado`
+   cuando la validacion pasa, asi que no hace falta filtrar por `puntuacion`.
+2. **Fecha:** `fechaFinalizacion` del primer `Resultado`. Hoy el flujo crea uno solo por
+   actividad, pero si existieran varios (ver la consecuencia anotada en DT-13), la actividad se
+   completo la primera vez.
+3. **Una sola consulta:** `ResultadoRepo.buscarPrimeraFinalizacionPorActividades` agrupa con
+   `groupBy` + `_min` los resultados del usuario para los ids de las actividades del modulo. No
+   repite el loop secuencial de DT-13: aqui el numero de consultas creceria con el numero de
+   bloques de una sola pantalla.
+4. **Fuente de verdad:** los ids salen de la tabla `Actividad` (`listarPorModulo`), no de los
+   bloques del contenido, por la misma razon dada en DT-13. Un bloque que referencia una
+   actividad inexistente se responde como pendiente (`descripcion: ""`, `completada: false`,
+   `fechaCompletada: null`) en lugar de fallar: un dato huerfano en el contenido no debe impedir
+   leer el modulo.
+
+El calculo de la fecha vive en `GestorAprendizaje.obtenerModulo`, que adjunta `fechaCompletada` a
+cada actividad; el controlador solo deriva `completada` al construir el bloque y sigue omitiendo
+`criteriosValidacion`.
+
+**Consecuencias:** La respuesta de 6.1b crece en dos campos por bloque `actividad` y el endpoint
+hace una consulta mas (constante, sin importar cuantas actividades tenga el modulo). La vista del
+docente (`GET /api/modulos/:idModulo`) y `mi-ruta` no cambian.
+
+**Alternativas consideradas:**
+- Exponer solo `completada`, sin fecha. Descartada: la fecha permite al frontend mostrar cuando
+  se completo sin otra llamada, y su costo es nulo porque sale de la misma consulta.
+- Calcularlo en el controlador consultando el repositorio directamente. Descartada: el
+  controlador no debe saltarse la capa de servicios de aplicacion (RNF-15).

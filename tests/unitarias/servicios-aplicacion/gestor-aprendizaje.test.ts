@@ -22,6 +22,7 @@ function crearDependenciasMock() {
       crearParaEvaluacion: vi.fn(),
       contarIntentosPorUsuarioYEvaluacion: vi.fn(),
       existeAprobadaPorUsuarioYEvaluacion: vi.fn(),
+      buscarPrimeraFinalizacionPorActividades: vi.fn().mockResolvedValue(new Map()),
     },
     calculadorProgreso: {
       recalcular: vi.fn(),
@@ -216,7 +217,82 @@ describe("GestorAprendizaje.obtenerModulo", () => {
     // Assert
     expect(dep.actividadRepo.listarPorModulo).toHaveBeenCalledWith(7);
     expect(resultado.modulo).toMatchObject({ idModulo: 7 });
-    expect(resultado.actividades).toBe(actividades);
+    expect(resultado.actividades).toMatchObject(actividades);
+  });
+
+  it("adjunta la fecha de completado de las actividades con resultado del estudiante", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(
+      rutaConModulo(7, null, moduloDePrueba())
+    );
+    dep.actividadRepo.listarPorModulo.mockResolvedValue([
+      { idActividad: 3, descripcion: "Despliega nginx" },
+      { idActividad: 4, descripcion: "Agrega un volumen" },
+    ]);
+    const fechaCompletada = new Date("2026-10-10T20:12:00.000Z");
+    dep.resultadoRepo.buscarPrimeraFinalizacionPorActividades.mockResolvedValue(
+      new Map([[3, fechaCompletada]])
+    );
+    const gestor = crearGestor(dep);
+
+    // Act
+    const resultado = await gestor.obtenerModulo(5, 7);
+
+    // Assert
+    expect(dep.resultadoRepo.buscarPrimeraFinalizacionPorActividades).toHaveBeenCalledTimes(1);
+    expect(dep.resultadoRepo.buscarPrimeraFinalizacionPorActividades).toHaveBeenCalledWith(
+      5,
+      [3, 4]
+    );
+    expect(resultado.actividades.map((a) => a.fechaCompletada)).toEqual([
+      fechaCompletada,
+      null,
+    ]);
+  });
+
+  it("deja fechaCompletada en null cuando el estudiante no tiene resultados", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(
+      rutaConModulo(7, null, moduloDePrueba())
+    );
+    dep.actividadRepo.listarPorModulo.mockResolvedValue([
+      { idActividad: 3, descripcion: "Despliega nginx" },
+    ]);
+    const gestor = crearGestor(dep);
+
+    // Act
+    const resultado = await gestor.obtenerModulo(5, 7);
+
+    // Assert
+    expect(resultado.actividades).toEqual([
+      { idActividad: 3, descripcion: "Despliega nginx", fechaCompletada: null },
+    ]);
+  });
+
+  it("no falla cuando el contenido referencia una actividad que ya no existe", async () => {
+    // Arrange
+    const dep = crearDependenciasMock();
+    dep.rutaRepo.buscarUltimaPorUsuario.mockResolvedValue(
+      rutaConModulo(
+        7,
+        null,
+        moduloDePrueba({ contenido: [{ tipo: "actividad", idActividad: 99 }] })
+      )
+    );
+    dep.actividadRepo.listarPorModulo.mockResolvedValue([]);
+    const gestor = crearGestor(dep);
+
+    // Act
+    const resultado = await gestor.obtenerModulo(5, 7);
+
+    // Assert
+    expect(resultado.actividades).toEqual([]);
+    expect(dep.resultadoRepo.buscarPrimeraFinalizacionPorActividades).toHaveBeenCalledWith(
+      5,
+      []
+    );
   });
 
   it("lanza ModuloNoAsignadoError cuando el modulo no pertenece a la ruta del estudiante", async () => {

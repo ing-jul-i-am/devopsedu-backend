@@ -63,6 +63,30 @@ export class ResultadoRepo {
     });
   }
 
+  // RF-23: usado por GestorAprendizaje para marcar como completadas las actividades del
+  // modulo (DT-18). Una sola consulta agrupada; si hubiera varios resultados por actividad,
+  // se toma la fecha de finalizacion mas antigua.
+  async buscarPrimeraFinalizacionPorActividades(
+    idUsuario: number,
+    idsActividad: number[]
+  ): Promise<Map<number, Date>> {
+    if (idsActividad.length === 0) {
+      return new Map();
+    }
+    const grupos = await this.prisma.resultado.groupBy({
+      by: ["idActividad"],
+      where: { idUsuario, idActividad: { in: idsActividad } },
+      _min: { fechaFinalizacion: true },
+    });
+    const fechas = new Map<number, Date>();
+    for (const grupo of grupos) {
+      if (grupo.idActividad !== null && grupo._min.fechaFinalizacion !== null) {
+        fechas.set(grupo.idActividad, grupo._min.fechaFinalizacion);
+      }
+    }
+    return fechas;
+  }
+
   async crearParaEvaluacion(
     datos: DatosResultadoEvaluacion
   ): Promise<Resultado> {

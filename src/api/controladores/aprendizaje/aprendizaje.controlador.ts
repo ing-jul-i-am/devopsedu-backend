@@ -5,14 +5,18 @@
 // Cubre: RF-22, RF-23, RF-24 — CU-13, CU-12, CU-14
 
 import type { RequestHandler, Request } from "express";
-import type { Evaluacion, Actividad } from "@prisma/client";
+import type { Evaluacion } from "@prisma/client";
 import type {
+  ActividadConCompletado,
   GestorAprendizaje,
   ModuloConActividades,
   RutaAprendizajeConEstadoDeModulos,
 } from "../../../servicios-aplicacion/gestor-aprendizaje.js";
 import type { PreguntaEvaluacion } from "../../../dominio/modelos/pregunta-evaluacion.js";
-import type { BloqueContenido } from "../../../dominio/modelos/bloque-contenido.js";
+import type {
+  BloqueActividad,
+  BloqueContenido,
+} from "../../../dominio/modelos/bloque-contenido.js";
 import type { UsuarioAutenticado } from "../../tipos/usuario-autenticado.js";
 import { TokenInvalidoError } from "../../../dominio/errores/token-invalido-error.js";
 import { ModuloNoAsignadoError } from "../../../dominio/errores/modulo-no-asignado-error.js";
@@ -46,21 +50,32 @@ function aRutaRespuesta(ruta: RutaAprendizajeConEstadoDeModulos) {
   };
 }
 
-// Enriquece los bloques tipo "actividad" con la descripcion de la actividad para que el
-// frontend no necesite otra llamada. Deliberadamente omite criteriosValidacion: es informacion
-// de validacion automatica, no contenido educativo para el estudiante.
+interface BloqueActividadRespuesta extends BloqueActividad {
+  descripcion: string;
+  completada: boolean;
+  fechaCompletada: Date | null;
+}
+
+// Enriquece los bloques tipo "actividad" con la descripcion de la actividad y si el estudiante
+// ya la completo (DT-18), para que el frontend no necesite otra llamada. Un bloque que
+// referencia una actividad inexistente se devuelve como pendiente en lugar de fallar.
+// Deliberadamente omite criteriosValidacion: es informacion de validacion automatica, no
+// contenido educativo para el estudiante.
 function aBloqueRespuesta(
   bloque: BloqueContenido,
-  actividades: Actividad[]
-): BloqueContenido | (Omit<BloqueContenido, "tipo"> & { tipo: "actividad"; descripcion: string }) {
+  actividades: ActividadConCompletado[]
+): BloqueContenido | BloqueActividadRespuesta {
   if (bloque.tipo !== "actividad") {
     return bloque;
   }
   const actividad = actividades.find((a) => a.idActividad === bloque.idActividad);
+  const fechaCompletada = actividad?.fechaCompletada ?? null;
   return {
     tipo: "actividad",
     idActividad: bloque.idActividad,
     descripcion: actividad?.descripcion ?? "",
+    completada: fechaCompletada !== null,
+    fechaCompletada,
   };
 }
 

@@ -35,14 +35,19 @@ export interface DependenciasGestorAprendizaje {
     | "crearParaEvaluacion"
     | "contarIntentosPorUsuarioYEvaluacion"
     | "existeAprobadaPorUsuarioYEvaluacion"
+    | "buscarPrimeraFinalizacionPorActividades"
   >;
   calculadorProgreso: Pick<CalculadorProgreso, "recalcular" | "recalcularConEstados">;
   actividadRepo: Pick<ActividadRepo, "listarPorModulo">;
 }
 
+// fechaCompletada es la finalizacion del primer Resultado del estudiante para la actividad,
+// o null si aun no la completa (DT-18).
+export type ActividadConCompletado = Actividad & { fechaCompletada: Date | null };
+
 export interface ModuloConActividades {
   modulo: Modulo;
-  actividades: Actividad[];
+  actividades: ActividadConCompletado[];
   fechaInicio: Date | null;
 }
 
@@ -104,17 +109,26 @@ export class GestorAprendizaje {
   }
 
   // RF-23: devuelve el contenido de un modulo asignado a la ruta activa del estudiante, junto
-  // con sus actividades practicas (el controlador las usa para enriquecer los bloques tipo
-  // "actividad" del contenido, ver aprendizaje.controlador.ts).
+  // con sus actividades practicas y la fecha en que el estudiante completo cada una (el
+  // controlador las usa para enriquecer los bloques tipo "actividad" del contenido, ver
+  // aprendizaje.controlador.ts). Los resultados se cargan en una sola consulta (DT-18).
   async obtenerModulo(
     idUsuario: number,
     idModulo: number
   ): Promise<ModuloConActividades> {
     const { rutaModulo } = await this.buscarRutaModulo(idUsuario, idModulo);
     const actividades = await this.dep.actividadRepo.listarPorModulo(idModulo);
+    const fechasCompletado =
+      await this.dep.resultadoRepo.buscarPrimeraFinalizacionPorActividades(
+        idUsuario,
+        actividades.map((actividad) => actividad.idActividad)
+      );
     return {
       modulo: rutaModulo.modulo,
-      actividades,
+      actividades: actividades.map((actividad) => ({
+        ...actividad,
+        fechaCompletada: fechasCompletado.get(actividad.idActividad) ?? null,
+      })),
       fechaInicio: rutaModulo.fechaInicio,
     };
   }

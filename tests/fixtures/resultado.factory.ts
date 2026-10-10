@@ -12,6 +12,7 @@ export interface ParcialesResultadoActividad {
   puntuacion?: number;
   tiempoEmpleado?: number;
   intentos?: number;
+  fechaFinalizacion?: Date;
 }
 
 export async function crearResultadoActividadEnBd(
@@ -24,6 +25,7 @@ export async function crearResultadoActividadEnBd(
       puntuacion: parciales.puntuacion ?? 100,
       tiempoEmpleado: parciales.tiempoEmpleado ?? 60,
       intentos: parciales.intentos ?? 1,
+      fechaFinalizacion: parciales.fechaFinalizacion ?? new Date(),
     },
   });
 }

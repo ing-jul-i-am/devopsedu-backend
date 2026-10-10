@@ -55,6 +55,10 @@ base de datos y resincroniza automaticamente (ver 3.6):
   `configuracion.volumenes`, que puede diferir y no ve los volumenes anonimos. Ver
   3.9.1. Ademas, `volumenesEliminados` ahora incluye los volumenes anonimos, que
   antes se omitian del reporte pese a destruirse.
+- RF-23, CU-12, DT-18: `GET /api/aprendizaje/modulos/:idModulo` agrega `completada`
+  y `fechaCompletada` a cada bloque `actividad` del contenido, para que el frontend
+  distinga las actividades pendientes de las completadas. Ver 6.1b. La vista del
+  docente (4.2b) y `mi-ruta` (6.1) no cambian.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -971,8 +975,20 @@ en caso contrario (ver DT-13).
 
 Devuelve el contenido de un modulo asignado a la ruta activa del estudiante
 (RF-23, ver DT-10). Los bloques `texto`, `imagen` y `enlace` se devuelven tal
-cual (ver 4.1); cada bloque `actividad` se enriquece con la `descripcion` de la
-actividad referenciada, para que el frontend no necesite otra llamada.
+cual (ver 4.1); cada bloque `actividad` se enriquece con datos de la actividad
+referenciada, para que el frontend no necesite otra llamada:
+
+| Campo | Tipo | Descripcion |
+| --- | --- | --- |
+| `descripcion` | `string` | Enunciado de la actividad |
+| `completada` | `boolean` | `true` si el estudiante autenticado tiene un `Resultado` para esa actividad (mismo criterio que el `estado` de 6.1, ver DT-18) |
+| `fechaCompletada` | `string \| null` | ISO 8601. `fechaFinalizacion` del primer `Resultado` del estudiante para esa actividad; `null` si no la ha completado |
+
+Solo cuentan los resultados del propio estudiante: el `Resultado` de otro
+usuario no marca la actividad. Si el bloque referencia una actividad que ya no
+existe, se devuelve como pendiente (`descripcion: ""`, `completada: false`,
+`fechaCompletada: null`) sin fallar.
+
 Deliberadamente **no** incluye `criteriosValidacion`: es informacion de
 validacion automatica, no contenido educativo.
 
@@ -986,7 +1002,21 @@ validacion automatica, no contenido educativo.
   "fechaInicio": "2026-08-28T10:00:00.000Z",
   "contenido": [
     { "tipo": "texto", "contenido": "Los contenedores empaquetan una aplicacion y sus dependencias (Markdown)." },
-    { "tipo": "actividad", "idActividad": 7, "descripcion": "Despliega un servicio con nginx y al menos un volumen" }
+    {
+      "tipo": "actividad",
+      "idActividad": 7,
+      "descripcion": "Despliega un servicio con nginx y al menos un volumen",
+      "completada": true,
+      "fechaCompletada": "2026-10-10T20:12:00.000Z"
+    },
+    { "tipo": "texto", "contenido": "Ahora conecta dos contenedores en la misma red." },
+    {
+      "tipo": "actividad",
+      "idActividad": 8,
+      "descripcion": "Crea una red y despliega dos servicios conectados a ella",
+      "completada": false,
+      "fechaCompletada": null
+    }
   ]
 }
 ```

@@ -15,6 +15,8 @@ import {
   bloqueActividad,
 } from "../../../fixtures/modulo.factory.js";
 import { crearActividadEnBd } from "../../../fixtures/actividad.factory.js";
+import { crearResultadoActividadEnBd } from "../../../fixtures/resultado.factory.js";
+import { crearUsuarioEnBd } from "../../../fixtures/usuario.factory.js";
 
 const ESTUDIANTE = {
   nombre: "Luis Estudiante",
@@ -96,9 +98,106 @@ describe("GET /api/aprendizaje/modulos/:idModulo", () => {
         tipo: "actividad",
         idActividad: actividad.idActividad,
         descripcion: "Despliega un contenedor nginx",
+        completada: false,
+        fechaCompletada: null,
       },
     ]);
     expect(respuesta.body.contenido[1].criteriosValidacion).toBeUndefined();
+  });
+
+  async function crearModuloConActividad() {
+    const modulo = await crearModuloEnBd({ nombre: "Introduccion" });
+    const actividad = await crearActividadEnBd({
+      idModulo: modulo.idModulo,
+      descripcion: "Despliega un contenedor nginx",
+    });
+    await prismaTest.modulo.update({
+      where: { idModulo: modulo.idModulo },
+      data: {
+        contenido: [
+          bloqueActividad({ idActividad: actividad.idActividad }),
+        ] as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return { modulo, actividad };
+  }
+
+  it("marca la actividad como completada cuando el estudiante tiene un resultado", async () => {
+    // Arrange
+    const { modulo, actividad } = await crearModuloConActividad();
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const token = await obtenerToken(ESTUDIANTE);
+    const ruta = await asignarRuta(ESTUDIANTE.correo, modulo.idModulo);
+    await crearResultadoActividadEnBd({
+      idUsuario: ruta.idUsuario,
+      idActividad: actividad.idActividad,
+      fechaFinalizacion: new Date("2026-10-10T20:12:00.000Z"),
+    });
+
+    // Act
+    const respuesta = await request(app)
+      .get(`/api/aprendizaje/modulos/${modulo.idModulo}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.contenido[0]).toMatchObject({
+      idActividad: actividad.idActividad,
+      completada: true,
+      fechaCompletada: "2026-10-10T20:12:00.000Z",
+    });
+  });
+
+  it("no marca la actividad como completada por un resultado de otro usuario", async () => {
+    // Arrange
+    const { modulo, actividad } = await crearModuloConActividad();
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const otroEstudiante = await crearUsuarioEnBd();
+    const token = await obtenerToken(ESTUDIANTE);
+    await asignarRuta(ESTUDIANTE.correo, modulo.idModulo);
+    await crearResultadoActividadEnBd({
+      idUsuario: otroEstudiante.idUsuario,
+      idActividad: actividad.idActividad,
+    });
+
+    // Act
+    const respuesta = await request(app)
+      .get(`/api/aprendizaje/modulos/${modulo.idModulo}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.contenido[0]).toMatchObject({
+      completada: false,
+      fechaCompletada: null,
+    });
+  });
+
+  it("devuelve la actividad como pendiente cuando el bloque referencia una actividad inexistente", async () => {
+    // Arrange
+    const modulo = await crearModuloEnBd({
+      contenido: [bloqueActividad({ idActividad: 999999 })],
+    });
+    await crearUsuarioConRol(ESTUDIANTE, "estudiante");
+    const token = await obtenerToken(ESTUDIANTE);
+    await asignarRuta(ESTUDIANTE.correo, modulo.idModulo);
+
+    // Act
+    const respuesta = await request(app)
+      .get(`/api/aprendizaje/modulos/${modulo.idModulo}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    // Assert
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.contenido).toEqual([
+      {
+        tipo: "actividad",
+        idActividad: 999999,
+        descripcion: "",
+        completada: false,
+        fechaCompletada: null,
+      },
+    ]);
   });
 
   it("rechaza con 404 cuando el modulo no pertenece a la ruta del estudiante", async () => {

@@ -9,6 +9,7 @@ import { limpiarBd } from "../../ayudas/limpiar-bd.js";
 import { crearUsuarioEnBd } from "../../fixtures/usuario.factory.js";
 import { crearActividadEnBd } from "../../fixtures/actividad.factory.js";
 import { crearEvaluacionEnBd } from "../../fixtures/evaluacion.factory.js";
+import { crearResultadoActividadEnBd } from "../../fixtures/resultado.factory.js";
 
 const UMBRAL = 70;
 
@@ -117,6 +118,74 @@ describe("ResultadoRepo", () => {
 
       // Assert
       expect(cantidad).toBe(1);
+    });
+  });
+
+  describe("buscarPrimeraFinalizacionPorActividades", () => {
+    it("devuelve por actividad la fecha de finalizacion mas antigua del usuario", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const actividadA = await crearActividadEnBd();
+      const actividadB = await crearActividadEnBd();
+      const masAntigua = new Date("2026-10-01T10:00:00.000Z");
+      await crearResultadoActividadEnBd({
+        idUsuario: usuario.idUsuario,
+        idActividad: actividadA.idActividad,
+        fechaFinalizacion: new Date("2026-10-05T10:00:00.000Z"),
+      });
+      await crearResultadoActividadEnBd({
+        idUsuario: usuario.idUsuario,
+        idActividad: actividadA.idActividad,
+        fechaFinalizacion: masAntigua,
+      });
+
+      // Act
+      const fechas = await repo.buscarPrimeraFinalizacionPorActividades(
+        usuario.idUsuario,
+        [actividadA.idActividad, actividadB.idActividad]
+      );
+
+      // Assert
+      expect(fechas).toEqual(new Map([[actividadA.idActividad, masAntigua]]));
+    });
+
+    it("ignora los resultados de otro usuario y de actividades fuera de la lista", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+      const otroUsuario = await crearUsuarioEnBd();
+      const actividadA = await crearActividadEnBd();
+      const actividadFuera = await crearActividadEnBd();
+      await crearResultadoActividadEnBd({
+        idUsuario: otroUsuario.idUsuario,
+        idActividad: actividadA.idActividad,
+      });
+      await crearResultadoActividadEnBd({
+        idUsuario: usuario.idUsuario,
+        idActividad: actividadFuera.idActividad,
+      });
+
+      // Act
+      const fechas = await repo.buscarPrimeraFinalizacionPorActividades(
+        usuario.idUsuario,
+        [actividadA.idActividad]
+      );
+
+      // Assert
+      expect(fechas.size).toBe(0);
+    });
+
+    it("devuelve un mapa vacio cuando la lista de actividades esta vacia", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+
+      // Act
+      const fechas = await repo.buscarPrimeraFinalizacionPorActividades(
+        usuario.idUsuario,
+        []
+      );
+
+      // Assert
+      expect(fechas.size).toBe(0);
     });
   });
 
