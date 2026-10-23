@@ -44,6 +44,28 @@ describe("POST /api/auth/login", () => {
     expect(respuesta.body.usuario).not.toHaveProperty("contrasenaCifrada");
   });
 
+  // DT-19: dos sesiones simultaneas del mismo usuario (doble clic, dos pestanas) no deben
+  // chocar con el indice unico de sesion.token.
+  it("permite dos inicios de sesion simultaneos del mismo usuario", async () => {
+    // Arrange
+    await request(app).post("/api/auth/registro").send(CREDENCIALES);
+    const credenciales = {
+      correo: CREDENCIALES.correo,
+      contrasena: CREDENCIALES.contrasena,
+    };
+
+    // Act
+    const [primero, segundo] = await Promise.all([
+      request(app).post("/api/auth/login").send(credenciales),
+      request(app).post("/api/auth/login").send(credenciales),
+    ]);
+
+    // Assert
+    expect(primero.status).toBe(200);
+    expect(segundo.status).toBe(200);
+    expect(primero.body.token).not.toBe(segundo.body.token);
+  });
+
   it("devuelve 401 con credenciales invalidas", async () => {
     // Act
     const respuesta = await request(app).post("/api/auth/login").send({

@@ -94,6 +94,48 @@
           }
         },
         {
+          "name": "Login estudiante por segunda vez (sesion concurrente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con un token distinto al de la sesion anterior', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos.token).to.not.equal(pm.environment.get('tokenEstudiante'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoEstudiante}}\",\n  \"contrasena\": \"{{contrasenaEstudiante}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "RF-02, DT-19: un segundo inicio de sesion del mismo usuario abre otra sesion con un token distinto (cada token lleva un jti unico), aunque ocurra en el mismo segundo. No sobrescribe tokenEstudiante, de modo que el resto de la coleccion sigue usando la primera sesion."
+          }
+        },
+        {
           "name": "Login docente (admin semilla)",
           "event": [
             {

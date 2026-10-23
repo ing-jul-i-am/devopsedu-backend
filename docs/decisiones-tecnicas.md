@@ -894,3 +894,31 @@ docente (`GET /api/modulos/:idModulo`) y `mi-ruta` no cambian.
   se completo sin otra llamada, y su costo es nulo porque sale de la misma consulta.
 - Calcularlo en el controlador consultando el repositorio directamente. Descartada: el
   controlador no debe saltarse la capa de servicios de aplicacion (RNF-15).
+
+---
+
+## DT-19: cada token JWT lleva un identificador unico (jti) (RF-02)
+
+**Fecha:** 2026-10-23
+
+**Contexto:** `EmisorToken.emitir` firmaba solo `{ idUsuario }`, y `jsonwebtoken` agrega `iat` y
+`exp` con resolucion de segundos. Dos inicios de sesion del mismo usuario dentro del mismo segundo
+producian exactamente el mismo token, y como `sesion.token` es `@unique`, el segundo
+`SesionRepo.crear` fallaba y el login respondia 500. Lo destapo la prueba
+`resetear-contrasena.test.ts`, que fallaba en cerca de la mitad de las corridas; en uso real lo
+provoca un doble clic en "Ingresar" o dos pestanas abiertas a la vez.
+
+**Decision:** `emitir` agrega `jwtid: randomUUID()` (de `node:crypto`), que viaja en el claim
+`jti`. Cada emision es distinta aunque coincidan usuario y segundo. `PayloadToken` declara
+`jti?: string`; la verificacion no lo usa, porque la revocacion sigue resolviendose por el token
+completo en la tabla `sesion`.
+
+**Consecuencias:** El token crece unos 50 caracteres, muy por debajo del limite de 512 de
+`sesion.token`. Los tokens emitidos antes del cambio siguen siendo validos hasta su expiracion.
+No hay dependencias nuevas.
+
+**Alternativas consideradas:**
+- Reintentar la creacion de la sesion ante la violacion de unicidad. Descartada: trata el sintoma
+  y no garantiza un token distinto si el reintento cae en el mismo segundo.
+- Quitar el `@unique` de `sesion.token`. Descartada: dos sesiones con el mismo token harian
+  ambigua la revocacion por token de `POST /api/auth/logout`.
