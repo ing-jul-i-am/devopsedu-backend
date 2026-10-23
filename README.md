@@ -132,6 +132,7 @@ Umbrales de cobertura: 80% en lineas, funciones y declaraciones, y 75% en ramas.
 | Recursos del servidor | `/api/servidor/capacidad` | RF-09, RF-10 |
 | Modulos (docente) | `/api/modulos` | RF-20, RF-23, RF-24 |
 | Rutas de aprendizaje (docente) | `/api/rutas` | RF-21 |
+| Reportes (docente) | `/api/reportes` | RF-25 |
 | Aprendizaje (estudiante) | `/api/aprendizaje` | RF-22, RF-23, RF-24 |
 
 El detalle de cada endpoint (cuerpos, respuestas y errores) esta en

@@ -1,7 +1,7 @@
 // src/repositorios/resultado-repo.ts
 // Repositorio de acceso a datos para los resultados de actividades y evaluaciones del
 // componente educativo.
-// Cubre: RF-23, RF-24 — CU-12, CU-14
+// Cubre: RF-23, RF-24, RF-25 — CU-12, CU-14, CU-15
 
 import type { PrismaClient, Resultado } from "@prisma/client";
 
@@ -108,6 +108,18 @@ export class ResultadoRepo {
   ): Promise<number> {
     return this.prisma.resultado.count({
       where: { idUsuario, idEvaluacion },
+    });
+  }
+
+  // RF-25: resultados de actividades y evaluaciones de todos los estudiantes del reporte en una
+  // sola consulta, del mas antiguo al mas reciente.
+  async listarPorUsuarios(idsUsuario: number[]): Promise<Resultado[]> {
+    if (idsUsuario.length === 0) {
+      return [];
+    }
+    return this.prisma.resultado.findMany({
+      where: { idUsuario: { in: idsUsuario } },
+      orderBy: [{ fechaFinalizacion: "asc" }, { idResultado: "asc" }],
     });
   }
 

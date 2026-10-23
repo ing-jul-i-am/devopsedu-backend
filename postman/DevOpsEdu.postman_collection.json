@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a5e6f7c8-0002-4b3c-9d4e-devopsedu0002",
     "name": "DevOpsEdu Backend",
-    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) y componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.\n5. DT-15: 'Desplegar servicio' recrea el contenedor si ya existe, lo que hace efectiva una configuracion editada, y destruye los volumenes que no son bind mount. Para verlo: Crear -> Desplegar -> Detener -> Editar configuracion -> Desplegar (la respuesta trae recreado: true).\n6. DT-16: la carpeta 'Casos de error' cierra con una secuencia de cuatro pasos que demuestra que el nombre de un servicio solo esta reservado mientras esta activo: crear -> repetir (409) -> eliminar -> volver a crear (201).",
+    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante) y reportes de progreso para el docente (RF-25).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje -> Reportes.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.\n5. DT-15: 'Desplegar servicio' recrea el contenedor si ya existe, lo que hace efectiva una configuracion editada, y destruye los volumenes que no son bind mount. Para verlo: Crear -> Desplegar -> Detener -> Editar configuracion -> Desplegar (la respuesta trae recreado: true).\n6. DT-16: la carpeta 'Casos de error' cierra con una secuencia de cuatro pasos que demuestra que el nombre de un servicio solo esta reservado mientras esta activo: crear -> repetir (409) -> eliminar -> volver a crear (201).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1171,6 +1171,99 @@
       ]
     },
     {
+      "name": "Reportes",
+      "item": [
+        {
+          "name": "Reporte de progreso de todos los estudiantes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con un reporte por estudiante', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.be.an('array');",
+                  "    const conRuta = datos.find((estudiante) => estudiante.ruta !== null);",
+                  "    if (conRuta) {",
+                  "        pm.expect(conRuta.ruta).to.have.property('progreso');",
+                  "        pm.expect(conRuta.ruta.modulos[0]).to.have.all.keys('idModulo', 'nombre', 'ordenSecuencia', 'estado', 'fechaInicio', 'actividades', 'evaluacion');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso"
+              ]
+            },
+            "description": "RF-25, CU-15, DT-20: progreso de todos los estudiantes, ordenados por nombre. Por estudiante trae la ruta vigente (o null), el estado de cada modulo, las actividades completadas y la evaluacion de cada modulo con la mejor nota, los intentos usados y si quedo aprobada. Es de solo lectura: no actualiza el progreso persistido. Exclusivo del docente."
+          }
+        },
+        {
+          "name": "Reporte de progreso de un estudiante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con solo el estudiante indicado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.have.lengthOf(1);",
+                  "    pm.expect(datos[0].idUsuario).to.equal(Number(pm.environment.get('idUsuarioEstudiante')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso?idUsuario={{idUsuarioEstudiante}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso"
+              ],
+              "query": [
+                {
+                  "key": "idUsuario",
+                  "value": "{{idUsuarioEstudiante}}"
+                }
+              ]
+            },
+            "description": "RF-25, CU-15, DT-20: igual que el reporte completo, limitado al estudiante indicado por idUsuario. Responde 404 si el id no existe o no corresponde a un estudiante."
+          }
+        }
+      ]
+    },
+    {
       "name": "Usuarios",
       "item": [
         {
@@ -1425,6 +1518,58 @@
               ]
             },
             "description": "DT-08: el endpoint de reseteo de contrasena esta restringido al rol docente; un estudiante recibe 403."
+          }
+        },
+        {
+          "name": "Consultar reporte como estudiante -> 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso"
+              ]
+            },
+            "description": "RF-25 / DT-20: los reportes son exclusivos del docente; autorizar('docente') rechaza con PermisoDenegadoError -> 403."
+          }
+        },
+        {
+          "name": "Reporte de estudiante inexistente -> 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso?idUsuario=999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso"
+              ],
+              "query": [
+                {
+                  "key": "idUsuario",
+                  "value": "999999"
+                }
+              ]
+            },
+            "description": "RF-25 / DT-20: un idUsuario inexistente (o de un docente) responde UsuarioNoEncontradoError -> 404."
           }
         },
         {

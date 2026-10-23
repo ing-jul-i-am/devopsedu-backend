@@ -1,6 +1,6 @@
 // src/repositorios/actividad-repo.ts
 // Repositorio de acceso a datos para las actividades practicas de un modulo de aprendizaje.
-// Cubre: RF-23 — CU-12
+// Cubre: RF-23, RF-25 — CU-12, CU-15
 
 import type { PrismaClient, Actividad, Prisma } from "@prisma/client";
 import type { CriteriosValidacion } from "../dominio/modelos/criterios-validacion.js";
@@ -35,6 +35,17 @@ export class ActividadRepo {
     return this.prisma.actividad.findMany({
       where: { idModulo },
       orderBy: { orden: "asc" },
+    });
+  }
+
+  // RF-25: actividades de todos los modulos del reporte en una sola consulta.
+  async listarPorModulos(idsModulo: number[]): Promise<Actividad[]> {
+    if (idsModulo.length === 0) {
+      return [];
+    }
+    return this.prisma.actividad.findMany({
+      where: { idModulo: { in: idsModulo } },
+      orderBy: [{ idModulo: "asc" }, { orden: "asc" }],
     });
   }
 }

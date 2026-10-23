@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/usuario-repo.test.ts
 // Pruebas de integracion del repositorio de usuarios contra la base de pruebas.
-// Cubre: RF-01, RF-04
+// Cubre: RF-01, RF-04, RF-25 — CU-15
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { UsuarioRepo } from "@/repositorios/usuario-repo.js";
@@ -148,6 +148,35 @@ describe("UsuarioRepo", () => {
       await expect(
         repo.actualizarContrasena(999_999, "hash_nuevo")
       ).rejects.toThrow();
+    });
+  });
+
+  // RF-25: base del reporte de progreso y del listado de estudiantes del docente (CU-15).
+  describe("listarPorRol", () => {
+    it("devuelve solo los usuarios del rol indicado, ordenados por nombre", async () => {
+      // Arrange
+      const estudiante = await crearRolEnBd({ nombre: "estudiante" });
+      const docente = await crearRolEnBd({ nombre: "docente" });
+      const zoe = await crearUsuarioEnBd({ nombre: "Zoe", idRol: estudiante.idRol });
+      const ana = await crearUsuarioEnBd({ nombre: "Ana", idRol: estudiante.idRol });
+      await crearUsuarioEnBd({ nombre: "Prof. Beto", idRol: docente.idRol });
+
+      // Act
+      const usuarios = await repo.listarPorRol("estudiante");
+
+      // Assert
+      expect(usuarios.map((u) => u.idUsuario)).toEqual([
+        ana.idUsuario,
+        zoe.idUsuario,
+      ]);
+    });
+
+    it("devuelve una lista vacia cuando el rol no existe", async () => {
+      // Act
+      const usuarios = await repo.listarPorRol("inexistente");
+
+      // Assert
+      expect(usuarios).toHaveLength(0);
     });
   });
 });

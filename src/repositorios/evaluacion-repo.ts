@@ -1,6 +1,6 @@
 // src/repositorios/evaluacion-repo.ts
 // Repositorio de acceso a datos para las evaluaciones de modulo (cardinalidad 0-o-1 con Modulo).
-// Cubre: RF-24 — CU-14
+// Cubre: RF-24, RF-25 — CU-14, CU-15
 
 import type { PrismaClient, Evaluacion, Prisma } from "@prisma/client";
 import type { PreguntaEvaluacion } from "../dominio/modelos/pregunta-evaluacion.js";
@@ -32,5 +32,16 @@ export class EvaluacionRepo {
 
   async buscarPorId(idEvaluacion: number): Promise<Evaluacion | null> {
     return this.prisma.evaluacion.findUnique({ where: { idEvaluacion } });
+  }
+
+  // RF-25: evaluaciones de todos los modulos del reporte en una sola consulta.
+  async listarPorModulos(idsModulo: number[]): Promise<Evaluacion[]> {
+    if (idsModulo.length === 0) {
+      return [];
+    }
+    return this.prisma.evaluacion.findMany({
+      where: { idModulo: { in: idsModulo } },
+      orderBy: { idModulo: "asc" },
+    });
   }
 }

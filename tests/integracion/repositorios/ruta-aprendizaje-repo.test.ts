@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/ruta-aprendizaje-repo.test.ts
 // Pruebas de integracion del repositorio de rutas de aprendizaje contra la base de pruebas.
-// Cubre: RF-21, RF-22, RF-23
+// Cubre: RF-21, RF-22, RF-23, RF-25
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { RutaAprendizajeRepo } from "@/repositorios/ruta-aprendizaje-repo.js";
@@ -150,6 +150,56 @@ describe("RutaAprendizajeRepo", () => {
       // Assert
       const encontrada = await repo.buscarUltimaPorUsuario(usuario.idUsuario);
       expect(Number(encontrada?.progreso)).toBe(50);
+    });
+  });
+
+  // RF-25: carga en una sola consulta la ruta vigente de varios estudiantes (CU-15).
+  describe("buscarUltimasPorUsuarios", () => {
+    it("devuelve la ruta mas reciente de cada usuario con sus modulos ordenados", async () => {
+      // Arrange
+      const ana = await crearUsuarioEnBd();
+      const luis = await crearUsuarioEnBd();
+      const moduloA = await crearModulo(1);
+      const moduloB = await crearModulo(2);
+      await repo.asignar(ana.idUsuario, [moduloA.idModulo]);
+      const vigenteAna = await repo.asignar(ana.idUsuario, [
+        moduloB.idModulo,
+        moduloA.idModulo,
+      ]);
+      const vigenteLuis = await repo.asignar(luis.idUsuario, [moduloA.idModulo]);
+
+      // Act
+      const rutas = await repo.buscarUltimasPorUsuarios([
+        ana.idUsuario,
+        luis.idUsuario,
+      ]);
+
+      // Assert
+      expect(rutas.size).toBe(2);
+      expect(rutas.get(ana.idUsuario)?.idRuta).toBe(vigenteAna.idRuta);
+      expect(
+        rutas.get(ana.idUsuario)?.rutaModulos.map((rm) => rm.modulo.nombre)
+      ).toEqual(["Modulo 2", "Modulo 1"]);
+      expect(rutas.get(luis.idUsuario)?.idRuta).toBe(vigenteLuis.idRuta);
+    });
+
+    it("omite a los usuarios que no tienen ruta asignada", async () => {
+      // Arrange
+      const usuario = await crearUsuarioEnBd();
+
+      // Act
+      const rutas = await repo.buscarUltimasPorUsuarios([usuario.idUsuario]);
+
+      // Assert
+      expect(rutas.has(usuario.idUsuario)).toBe(false);
+    });
+
+    it("devuelve un mapa vacio cuando no se indica ningun usuario", async () => {
+      // Act
+      const rutas = await repo.buscarUltimasPorUsuarios([]);
+
+      // Assert
+      expect(rutas.size).toBe(0);
     });
   });
 });

@@ -922,3 +922,54 @@ No hay dependencias nuevas.
   y no garantiza un token distinto si el reintento cae en el mismo segundo.
 - Quitar el `@unique` de `sesion.token`. Descartada: dos sesiones con el mismo token harian
   ambigua la revocacion por token de `POST /api/auth/logout`.
+
+---
+
+## DT-20: reporte de progreso del docente de solo lectura, en lote y con la mejor nota (RF-25)
+
+**Fecha:** 2026-10-23
+
+**Contexto:** RF-25 ("Consulta de resultados experimentales", CU-15 y CU-16) no tiene tabla de
+especificacion en el diseno. El diseno ademas asigna los reportes agregados a un perfil
+investigador que nunca se implemento: el seed solo crea `estudiante` y `docente`. El desarrollador
+acordo el contenido y el acceso del reporte antes de implementarlo.
+
+**Decision:**
+
+1. **Acceso:** solo el rol `docente`. El perfil investigador se descarta (tambien se registro en
+   `CLAUDE.md`, seccion 1).
+2. **Contenido por estudiante:** la ruta vigente (la asignada mas recientemente, mismo criterio
+   que `buscarUltimaPorUsuario`), su progreso, el estado de cada modulo, las actividades
+   completadas con su fecha y, por modulo, un resumen de la evaluacion: **mejor nota**, intentos
+   usados, intentos maximos y si quedo aprobada. Se reporta la mejor nota y no cada intento
+   porque es la que decide la aprobacion (DT-11) y mantiene una fila por modulo en la
+   exportacion.
+3. **Mismas reglas que la vista del estudiante:** el calculo vive en una funcion pura,
+   `src/dominio/reporte-progreso.ts`, que delega en `calcularEstadoModulo` y
+   `calcularProgresoRuta`, las mismas reglas de `CalculadorProgreso`. El reporte y `mi-ruta` no
+   pueden contradecirse.
+4. **Solo lectura:** `GestorReportes` no persiste el progreso recalculado, a diferencia de
+   `mi-ruta` (DT-14). Un GET de reporte no debe modificar datos de los estudiantes.
+5. **Consultas en lote:** en vez de reutilizar `CalculadorProgreso`, que hace varias consultas
+   por modulo y por estudiante, `GestorReportes` carga todo con cinco consultas fijas
+   (estudiantes, rutas vigentes, actividades, evaluaciones y resultados), cualquiera que sea el
+   numero de estudiantes o de modulos. Para eso se agregaron `UsuarioRepo.listarPorRol`,
+   `RutaAprendizajeRepo.buscarUltimasPorUsuarios`, `ActividadRepo.listarPorModulos`,
+   `EvaluacionRepo.listarPorModulos` y `ResultadoRepo.listarPorUsuarios`.
+6. **Filtro por estudiante:** `?idUsuario=N` limita el reporte a un estudiante. Un id inexistente
+   y el id de un docente responden igual (`404`, `UsuarioNoEncontradoError`), para no revelar
+   que usuarios existen con otro rol.
+
+**Consecuencias:** El progreso del reporte puede diferir del valor persistido en
+`ruta_aprendizaje.progreso` si este quedo desfasado (por ejemplo, porque el docente agrego una
+actividad a un modulo despues); el reporte siempre muestra el valor recalculado, y el persistido
+se corrige la proxima vez que el estudiante consulta `mi-ruta`. Una actividad se cuenta como
+completada por actividad distinta, no por numero de resultados; hoy el flujo crea un solo
+resultado por actividad (DT-13), asi que coincide con el conteo de `CalculadorProgreso`.
+
+**Alternativas consideradas:**
+- Reutilizar `CalculadorProgreso.recalcularConEstados` por estudiante. Descartada: hace
+  consultas por modulo y por estudiante, y persiste el progreso como efecto secundario.
+- Reportar todas las notas de cada intento. Descartada por el desarrollador: la mejor nota mas
+  los intentos basta, y una fila por intento duplicaria las filas de la exportacion.
+- Un rol `investigador` con acceso de solo lectura. Descartado por el desarrollador.

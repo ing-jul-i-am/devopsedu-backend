@@ -1,7 +1,7 @@
 // src/repositorios/usuario-repo.ts
 // Repositorio de acceso a datos para la entidad Usuario. Unico punto de la capa de datos
 // que conoce el detalle de persistencia de usuarios (CLAUDE.md 3, capa de acceso a datos).
-// Cubre: RF-01, RF-04
+// Cubre: RF-01, RF-04, RF-25
 
 import type { PrismaClient, Usuario, Rol } from "@prisma/client";
 
@@ -35,6 +35,15 @@ export class UsuarioRepo {
     return this.prisma.usuario.findUnique({
       where: { idUsuario },
       include: { rol: true },
+    });
+  }
+
+  // RF-25: base del reporte de progreso y del listado de estudiantes del docente (CU-15). El
+  // desempate por idUsuario mantiene un orden estable entre homonimos.
+  async listarPorRol(nombreRol: string): Promise<Usuario[]> {
+    return this.prisma.usuario.findMany({
+      where: { rol: { nombre: nombreRol } },
+      orderBy: [{ nombre: "asc" }, { idUsuario: "asc" }],
     });
   }
 

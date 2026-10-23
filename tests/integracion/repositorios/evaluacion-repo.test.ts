@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/evaluacion-repo.test.ts
 // Pruebas de integracion del repositorio de evaluaciones de modulo.
-// Cubre: RF-24 — CU-14
+// Cubre: RF-24, RF-25 — CU-14, CU-15
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { EvaluacionRepo } from "@/repositorios/evaluacion-repo.js";
@@ -108,6 +108,37 @@ describe("EvaluacionRepo", () => {
 
       // Assert
       expect(encontrada).toBeNull();
+    });
+  });
+
+  // RF-25: carga las evaluaciones de todos los modulos del reporte en una sola consulta.
+  describe("listarPorModulos", () => {
+    it("devuelve solo las evaluaciones de los modulos indicados", async () => {
+      // Arrange
+      const moduloA = await crearModuloEnBd();
+      const moduloB = await crearModuloEnBd();
+      const sinEvaluacion = await crearModuloEnBd();
+      const evaluacionA = await crearEvaluacionEnBd({ idModulo: moduloA.idModulo });
+      await crearEvaluacionEnBd({ idModulo: moduloB.idModulo });
+
+      // Act
+      const evaluaciones = await repo.listarPorModulos([
+        moduloA.idModulo,
+        sinEvaluacion.idModulo,
+      ]);
+
+      // Assert
+      expect(evaluaciones.map((e) => e.idEvaluacion)).toEqual([
+        evaluacionA.idEvaluacion,
+      ]);
+    });
+
+    it("devuelve una lista vacia cuando no se indica ningun modulo", async () => {
+      // Act
+      const evaluaciones = await repo.listarPorModulos([]);
+
+      // Assert
+      expect(evaluaciones).toHaveLength(0);
     });
   });
 });

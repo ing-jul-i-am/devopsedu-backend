@@ -1,6 +1,6 @@
 // tests/integracion/repositorios/resultado-repo.test.ts
 // Pruebas de integracion del repositorio de resultados de actividades y evaluaciones.
-// Cubre: RF-23, RF-24 — CU-12, CU-14
+// Cubre: RF-23, RF-24, RF-25 — CU-12, CU-14, CU-15
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { ResultadoRepo } from "@/repositorios/resultado-repo.js";
@@ -9,7 +9,10 @@ import { limpiarBd } from "../../ayudas/limpiar-bd.js";
 import { crearUsuarioEnBd } from "../../fixtures/usuario.factory.js";
 import { crearActividadEnBd } from "../../fixtures/actividad.factory.js";
 import { crearEvaluacionEnBd } from "../../fixtures/evaluacion.factory.js";
-import { crearResultadoActividadEnBd } from "../../fixtures/resultado.factory.js";
+import {
+  crearResultadoActividadEnBd,
+  crearResultadoEvaluacionEnBd,
+} from "../../fixtures/resultado.factory.js";
 
 const UMBRAL = 70;
 
@@ -310,6 +313,52 @@ describe("ResultadoRepo", () => {
 
       // Assert
       expect(aprobada).toBe(false);
+    });
+  });
+
+  // RF-25: carga los resultados de todos los estudiantes del reporte en una sola consulta.
+  describe("listarPorUsuarios", () => {
+    it("devuelve los resultados de los usuarios indicados del mas antiguo al mas reciente", async () => {
+      // Arrange
+      const ana = await crearUsuarioEnBd();
+      const luis = await crearUsuarioEnBd();
+      const otro = await crearUsuarioEnBd();
+      const actividad = await crearActividadEnBd();
+      const evaluacion = await crearEvaluacionEnBd();
+      const reciente = await crearResultadoActividadEnBd({
+        idUsuario: ana.idUsuario,
+        idActividad: actividad.idActividad,
+        fechaFinalizacion: new Date("2026-03-02"),
+      });
+      const antiguo = await crearResultadoActividadEnBd({
+        idUsuario: luis.idUsuario,
+        idActividad: actividad.idActividad,
+        fechaFinalizacion: new Date("2026-03-01"),
+      });
+      await crearResultadoEvaluacionEnBd({
+        idUsuario: otro.idUsuario,
+        idEvaluacion: evaluacion.idEvaluacion,
+      });
+
+      // Act
+      const resultados = await repo.listarPorUsuarios([
+        ana.idUsuario,
+        luis.idUsuario,
+      ]);
+
+      // Assert
+      expect(resultados.map((r) => r.idResultado)).toEqual([
+        antiguo.idResultado,
+        reciente.idResultado,
+      ]);
+    });
+
+    it("devuelve una lista vacia cuando no se indica ningun usuario", async () => {
+      // Act
+      const resultados = await repo.listarPorUsuarios([]);
+
+      // Assert
+      expect(resultados).toHaveLength(0);
     });
   });
 });
