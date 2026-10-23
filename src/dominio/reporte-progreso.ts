@@ -213,6 +213,61 @@ export function resumirRuta(ruta: ReporteRuta | null): ResumenRuta | null {
   };
 }
 
+// RF-25, CU-16: columnas de la exportacion tabular (CSV). Cada fila de aFilasReporte trae una
+// celda por columna, en este mismo orden.
+export const COLUMNAS_REPORTE = [
+  "id_estudiante",
+  "estudiante",
+  "correo",
+  "fecha_asignacion_ruta",
+  "progreso_ruta",
+  "orden_modulo",
+  "modulo",
+  "estado_modulo",
+  "actividades_completadas",
+  "actividades_totales",
+  "evaluacion",
+  "mejor_nota",
+  "intentos_evaluacion",
+  "evaluacion_aprobada",
+] as const;
+
+// null representa una celda vacia (dato que no aplica), distinta de un 0.
+export type CeldaReporte = string | number | null;
+
+// Una fila por (estudiante, modulo); un estudiante sin ruta ocupa una sola fila con las columnas
+// de ruta y modulo vacias. Las fechas van en ISO 8601 (UTC) para que no dependan de la zona
+// horaria de quien abre el archivo (DT-22).
+export function aFilasReporte(reportes: ReporteEstudiante[]): CeldaReporte[][] {
+  return reportes.flatMap((reporte) => {
+    const estudiante: CeldaReporte[] = [
+      reporte.idUsuario,
+      reporte.nombre,
+      reporte.correo,
+    ];
+    const { ruta } = reporte;
+    if (!ruta) {
+      return [
+        [...estudiante, ...Array<null>(COLUMNAS_REPORTE.length - 3).fill(null)],
+      ];
+    }
+    return ruta.modulos.map((modulo) => [
+      ...estudiante,
+      ruta.fechaAsignacion.toISOString(),
+      ruta.progreso,
+      modulo.ordenSecuencia,
+      modulo.nombre,
+      modulo.estado,
+      modulo.actividades.completadas,
+      modulo.actividades.total,
+      modulo.evaluacion?.titulo ?? null,
+      modulo.evaluacion?.mejorNota ?? null,
+      modulo.evaluacion?.intentos ?? null,
+      modulo.evaluacion ? (modulo.evaluacion.aprobada ? "si" : "no") : null,
+    ]);
+  });
+}
+
 // DT-18: una actividad se completo la primera vez que el estudiante obtuvo un resultado.
 function primeraFinalizacion(
   resultados: ResultadoEntradaReporte[],

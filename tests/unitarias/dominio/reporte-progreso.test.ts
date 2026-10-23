@@ -4,6 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  COLUMNAS_REPORTE,
+  aFilasReporte,
   construirReporteEstudiante,
   resumirEvaluacion,
   resumirRuta,
@@ -245,5 +247,80 @@ describe("resumirRuta", () => {
 
     // Assert
     expect(resumen).toBeNull();
+  });
+});
+
+// RF-25, CU-16: filas planas para la exportacion, una por estudiante y modulo.
+describe("aFilasReporte", () => {
+  it("produce una fila por modulo con los datos del estudiante, la ruta y la evaluacion", () => {
+    // Arrange
+    const reporte = construirReporteEstudiante(
+      entradaReporteEstudiante({
+        actividades: [actividadDeReporte({ idActividad: 10 })],
+        evaluaciones: [evaluacionDeReporte({ idEvaluacion: 7 })],
+        resultados: [
+          resultadoDeReporte({ idActividad: 10 }),
+          resultadoDeReporte({ idEvaluacion: 7, puntuacion: 65 }),
+        ],
+      })
+    );
+
+    // Act
+    const filas = aFilasReporte([reporte]);
+
+    // Assert
+    expect(filas).toEqual([
+      [
+        1,
+        "Ana Estudiante",
+        "ana@devopsedu.local",
+        "2026-02-01T00:00:00.000Z",
+        0,
+        1,
+        "Introduccion a contenedores",
+        "en_progreso",
+        1,
+        1,
+        "Evaluacion del modulo",
+        65,
+        1,
+        "no",
+      ],
+    ]);
+    expect(filas[0]).toHaveLength(COLUMNAS_REPORTE.length);
+  });
+
+  it("deja vacias las columnas de evaluacion cuando el modulo no tiene evaluacion", () => {
+    // Arrange
+    const reporte = construirReporteEstudiante(entradaReporteEstudiante());
+
+    // Act
+    const [fila] = aFilasReporte([reporte]);
+
+    // Assert
+    expect(fila?.slice(10)).toEqual([null, null, null, null]);
+  });
+
+  it("produce una sola fila con las columnas de ruta vacias cuando el estudiante no tiene ruta", () => {
+    // Arrange
+    const reporte = construirReporteEstudiante(
+      entradaReporteEstudiante({ ruta: null })
+    );
+
+    // Act
+    const filas = aFilasReporte([reporte]);
+
+    // Assert
+    expect(filas).toEqual([
+      [1, "Ana Estudiante", "ana@devopsedu.local", ...Array(11).fill(null)],
+    ]);
+  });
+
+  it("devuelve una lista vacia cuando no hay estudiantes", () => {
+    // Act
+    const filas = aFilasReporte([]);
+
+    // Assert
+    expect(filas).toEqual([]);
   });
 });

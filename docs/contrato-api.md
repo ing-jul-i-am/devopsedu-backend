@@ -66,6 +66,9 @@ base de datos y resincroniza automaticamente (ver 3.6):
 - Etapa 7 (RF-25, CU-15, DT-21): se agrega `GET /api/usuarios/estudiantes` (docente) con
   el listado de estudiantes y un resumen de su ruta (7.2). El reporte de 8b.1 agrega
   `fechaRegistro` a cada estudiante.
+- Etapa 7 (RF-25, CU-16, DT-22): se agrega `GET /api/reportes/progreso/exportar` para
+  descargar el reporte en CSV o PDF (8b.2). CORS expone `Content-Disposition` para que el
+  frontend lea el nombre del archivo.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -1303,6 +1306,60 @@ Sin estudiantes registrados, `[]`.
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `UsuarioNoEncontradoError` — `idUsuario` no existe o no es un estudiante |
 
+### 8b.2 `GET /api/reportes/progreso/exportar`
+
+Cubre RF-25 — CU-16 (DT-22). Descarga el mismo reporte de 8b.1 como archivo.
+
+**Query params**
+
+| Param | Tipo | Obligatorio | Uso |
+| --- | --- | --- | --- |
+| `formato` | `"csv"` o `"pdf"` | Si | Formato del archivo |
+| `idUsuario` | entero positivo | No | Limita la exportacion a ese estudiante |
+
+**Response `200 OK`**: el cuerpo es el archivo, no JSON.
+
+| Formato | `Content-Type` | Nombre del archivo (`Content-Disposition: attachment`) |
+| --- | --- | --- |
+| `csv` | `text/csv; charset=utf-8` | `reporte-progreso-AAAA-MM-DD.csv` |
+| `pdf` | `application/pdf` | `reporte-progreso-AAAA-MM-DD.pdf` |
+
+Con `idUsuario`, el nombre pasa a `reporte-progreso-estudiante-<idUsuario>-AAAA-MM-DD.<formato>`.
+La fecha es la de generacion, en UTC. `Content-Disposition` esta expuesto por CORS, de modo
+que el frontend puede leerlo para proponer el nombre al guardar.
+
+**CSV**: UTF-8 con BOM (para que Excel muestre bien tildes y enies), separador coma y fin de
+registro CRLF (RFC 4180). Una fila por estudiante y modulo; un estudiante sin ruta ocupa una
+fila con las columnas de ruta y modulo vacias. Columnas, en este orden:
+
+```
+id_estudiante,estudiante,correo,fecha_asignacion_ruta,progreso_ruta,orden_modulo,modulo,
+estado_modulo,actividades_completadas,actividades_totales,evaluacion,mejor_nota,
+intentos_evaluacion,evaluacion_aprobada
+```
+
+- `fecha_asignacion_ruta` va en ISO 8601 UTC (`2026-02-01T10:00:00.000Z`).
+- `estado_modulo` usa los valores de la API (`completado`, `en_progreso`, `sin_iniciar`).
+- Las columnas de evaluacion quedan vacias si el modulo no tiene evaluacion;
+  `evaluacion_aprobada` es `si` o `no`.
+- Una celda de texto que empieza con `=`, `+`, `-`, `@`, tabulador o retorno de carro se
+  escribe con un apostrofo delante (`'=...`) para que la hoja de calculo no la ejecute como
+  formula.
+
+**PDF**: tamano carta. Encabezado con la fecha de generacion y el numero de estudiantes; por
+estudiante, su nombre y correo, la ruta (id, fecha de asignacion y progreso) y una tabla de
+modulos con estado, actividades completadas, mejor nota, intentos y si aprobo.
+
+**Errores posibles**
+
+| Codigo | Cuando |
+| --- | --- |
+| `400` | Falta `formato`, no es `csv` ni `pdf`, o `idUsuario` no es un entero positivo (`{ "error": "Parametros de consulta invalidos" }`) |
+| `401` / `403` | Igual que el resto del grupo |
+| `404` | `UsuarioNoEncontradoError` — `idUsuario` no existe o no es un estudiante |
+
+Los errores se responden en JSON, como en el resto de la API.
+
 ---
 
 ## 9. Catalogo de errores de dominio
@@ -1358,17 +1415,16 @@ Referencia completa de las clases en `src/dominio/errores/`, su codigo HTTP y el
 No implementado aun en el backend (no invocar desde el frontend todavia):
 
 - Gestion de perfil propio del usuario (RF-04 como endpoint de autoservicio, p. ej.
-  `GET/PUT /api/usuarios/yo`). El unico endpoint implementado en `/api/usuarios` es
-  el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
+  `GET/PUT /api/usuarios/yo`). En `/api/usuarios` solo existen el reseteo
+  administrativo de contrasena (DT-08, 7.1) y el listado de estudiantes (DT-21, 7.2),
+  ambos exclusivos del docente.
 - Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
   DT-08 para la relacion con el reseteo administrativo actual).
-- Exportacion del reporte de progreso en CSV o PDF (docente, RF-25, CU-16). Es lo unico
-  pendiente de la Etapa 7; la consulta del reporte (8b.1) y el listado de estudiantes
-  (7.2) ya existen.
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por
   `MonitorPeriodico` (RF-16, RF-18, RF-19); no hay endpoint de "metrica actual" fuera
   de ese historico.
 
-Cuando el backend avance a la Etapa 7 (ver CLAUDE.md seccion 11), este documento
-debe actualizarse antes de que el frontend dependa de esos endpoints.
+Con la Etapa 7 el plan de etapas del backend (CLAUDE.md seccion 11) queda completo. Si
+alguno de estos puntos se implementa, este documento debe actualizarse antes de que el
+frontend dependa de el.

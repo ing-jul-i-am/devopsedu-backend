@@ -1011,3 +1011,55 @@ hay un segundo calculo de progreso que mantener.
 - Ubicarlo en `/api/reportes/estudiantes`. Descartada: el listado sirve para operar sobre
   usuarios (asignar rutas, resetear contrasenas), no solo para consultar resultados.
 - Solo datos basicos, sin resumen de ruta. Descartada por el desarrollador.
+
+---
+
+## DT-22: exportacion del reporte de progreso en CSV y PDF (RF-25, CU-16)
+
+**Fecha:** 2026-10-23
+
+**Contexto:** CU-16 pide exportar los datos para analizarlos fuera de la plataforma. El
+desarrollador eligio CSV o PDF a eleccion del docente y, por defecto, todos los estudiantes en un
+solo archivo, con un filtro opcional por estudiante.
+
+**Decision:**
+
+1. **Endpoint:** `GET /api/reportes/progreso/exportar?formato=csv|pdf[&idUsuario=N]`, exclusivo
+   del docente. Exporta exactamente el reporte de DT-20; no hay un segundo calculo.
+2. **CSV sin dependencias** (`src/infraestructura/exportador-csv.ts`): RFC 4180 (coma, CRLF,
+   comillas dobles), BOM UTF-8 para que Excel muestre bien tildes y enies, y una fila por
+   estudiante y modulo (`aFilasReporte` en el dominio). Las fechas van en ISO 8601 UTC para no
+   depender de la zona horaria de quien abre el archivo. Se uso coma y no punto y coma porque en
+   la configuracion regional de Guatemala el separador decimal es el punto.
+3. **Proteccion contra inyeccion de formulas:** una celda de texto que empieza con `=`, `+`, `-`,
+   `@`, tabulador o retorno de carro se escribe con un apostrofo delante. Los nombres los escribe
+   el propio estudiante al registrarse, de modo que sin esto podria plantar una formula que se
+   ejecute en la hoja de calculo del docente. Los numeros, incluidos los negativos, no se tocan.
+4. **PDF con pdfkit 0.20.2** (`src/infraestructura/exportador-pdf.ts`), fijado a una version
+   exacta, y `@types/pdfkit` 0.17.6 en desarrollo. Justificacion RNF-20: el desarrollador pidio
+   PDF; pdfkit es JavaScript puro, sin navegador ni binarios del sistema, y su fuente estandar
+   Helvetica (WinAnsi) cubre tildes y enies sin archivos de fuentes. Tamano carta, un encabezado
+   y, por estudiante, sus datos y una tabla de modulos. Un estudiante que no cabe al pie empieza
+   en una pagina nueva.
+5. **Nombre del archivo:** `reporte-progreso[-estudiante-N]-AAAA-MM-DD.csv|pdf` (fecha de
+   generacion, UTC), en `Content-Disposition: attachment`. CORS expone ese encabezado
+   (`exposedHeaders`), porque si no el frontend, que corre en otro origen, no podria leerlo.
+6. **Bitacora:** cada exportacion registra `logger.warn({ evento: "reporte_exportado", idDocente,
+   formato, idUsuario, estudiantes })`, como operacion administrativa (RNF-14, CLAUDE.md 6.6).
+
+**Consecuencias:** Se agrega una dependencia de produccion (pdfkit) y una de desarrollo (sus
+tipos). El PDF se genera completo en memoria antes de enviarse; para el tamano de grupo del
+prototipo son pocos kilobytes. Cuando la tabla de un estudiante con muchos modulos cruza de
+pagina, pdfkit continua las filas en la pagina siguiente pero no repite la cabecera de la tabla.
+Las etiquetas del PDF no llevan tildes, igual que el resto de los textos del codigo; los datos
+(nombres de estudiantes y modulos) si las conservan.
+
+**Alternativas consideradas:**
+- Una libreria de CSV (por ejemplo `csv-stringify`). Descartada: el formato es simple y RFC 4180
+  cabe en pocas lineas probadas, sin otra dependencia (RNF-20).
+- pdfmake. Descartada por el desarrollador: comodo para tablas, pero en Node exige registrar
+  archivos de fuentes.
+- Generar el PDF desde HTML con un navegador sin cabeza. Descartada: agrega un navegador completo
+  al servidor.
+- Exportar un archivo por estudiante en un ZIP. Descartada: el desarrollador prefirio un solo
+  archivo con filtro opcional.

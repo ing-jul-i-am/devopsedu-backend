@@ -31,6 +31,7 @@ El diseño formal se encuentra en `Diseño_tecnico_de_proyecto.pdf`. Cuando una 
 | Validación | Zod | 3.x |
 | Autenticación | JWT (jsonwebtoken) + bcrypt | últimas estables |
 | Logging | Pino | 8.x o superior |
+| Generación de PDF (reportes, RF-25) | pdfkit | 0.20.x |
 | **Framework de pruebas** | **Vitest** | **última estable** |
 | **Tests HTTP de integración** | **Supertest** | **última estable** |
 | **Mocking** | **vi.mock + vi.fn (incluidos en Vitest)** | — |

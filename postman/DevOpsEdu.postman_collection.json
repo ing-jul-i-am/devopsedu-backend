@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a5e6f7c8-0002-4b3c-9d4e-devopsedu0002",
     "name": "DevOpsEdu Backend",
-    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante) y reportes de progreso para el docente (RF-25).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje -> Reportes.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.\n5. DT-15: 'Desplegar servicio' recrea el contenedor si ya existe, lo que hace efectiva una configuracion editada, y destruye los volumenes que no son bind mount. Para verlo: Crear -> Desplegar -> Detener -> Editar configuracion -> Desplegar (la respuesta trae recreado: true).\n6. DT-16: la carpeta 'Casos de error' cierra con una secuencia de cuatro pasos que demuestra que el nombre de un servicio solo esta reservado mientras esta activo: crear -> repetir (409) -> eliminar -> volver a crear (201).",
+    "description": "Coleccion de pruebas manuales para el backend de DevOpsEdu. Cubre identidad (RF-01 a RF-03), gestion de servicios (RF-05 a RF-08, RF-11 a RF-14, RF-17), catalogo de imagenes (RF-07), verificacion y consulta de recursos (RF-09, RF-10), historico de metricas (RF-18) componente educativo (RF-20 a RF-22: gestion de modulos, asignacion de rutas de aprendizaje y consulta de progreso del estudiante) y reportes de progreso para el docente con exportacion en CSV o PDF (RF-25).\n\nUso recomendado:\n1. Seleccionar el ambiente 'DevOpsEdu - Local'.\n2. Levantar la base de datos (docker compose up -d) y el servidor (npm run dev).\n3. Ejecutar las carpetas en orden: Auth -> Servidor -> Servicios -> Modulos -> Rutas -> Aprendizaje -> Reportes.\n4. Los requests de Login guardan el token (y, para el estudiante, su idUsuario) automaticamente; Crear servicio guarda idServicio; los requests de Modulos y Rutas guardan idModulo1/idModulo2/idRuta automaticamente.\n5. DT-15: 'Desplegar servicio' recrea el contenedor si ya existe, lo que hace efectiva una configuracion editada, y destruye los volumenes que no son bind mount. Para verlo: Crear -> Desplegar -> Detener -> Editar configuracion -> Desplegar (la respuesta trae recreado: true).\n6. DT-16: la carpeta 'Casos de error' cierra con una secuencia de cuatro pasos que demuestra que el nombre de un servicio solo esta reservado mientras esta activo: crear -> repetir (409) -> eliminar -> volver a crear (201).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1260,6 +1260,151 @@
             },
             "description": "RF-25, CU-15, DT-20: igual que el reporte completo, limitado al estudiante indicado por idUsuario. Responde 404 si el id no existe o no corresponde a un estudiante."
           }
+        },
+        {
+          "name": "Exportar reporte en CSV",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con un CSV descargable', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "    const disposicion = pm.response.headers.get('Content-Disposition');",
+                  "    pm.expect(disposicion).to.include('attachment');",
+                  "    pm.expect(disposicion).to.match(/reporte-progreso-\\d{4}-\\d{2}-\\d{2}\\.csv/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso/exportar?formato=csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso",
+                "exportar"
+              ],
+              "query": [
+                {
+                  "key": "formato",
+                  "value": "csv"
+                }
+              ]
+            },
+            "description": "RF-25, CU-16, DT-22: descarga el reporte de progreso de todos los estudiantes en CSV (UTF-8 con BOM, separador coma, una fila por estudiante y modulo). Las celdas de texto que empiezan con = + - @ se escriben con un apostrofo delante para que la hoja de calculo no las ejecute como formula. Para guardar el archivo, usar 'Send and Download' en lugar de 'Send'."
+          }
+        },
+        {
+          "name": "Exportar reporte en PDF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con un PDF descargable', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+                  "    const disposicion = pm.response.headers.get('Content-Disposition');",
+                  "    pm.expect(disposicion).to.include('attachment');",
+                  "    pm.expect(disposicion).to.match(/reporte-progreso-\\d{4}-\\d{2}-\\d{2}\\.pdf/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso/exportar?formato=pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso",
+                "exportar"
+              ],
+              "query": [
+                {
+                  "key": "formato",
+                  "value": "pdf"
+                }
+              ]
+            },
+            "description": "RF-25, CU-16, DT-22: descarga el reporte de progreso de todos los estudiantes en PDF (tamano carta, una seccion por estudiante con su ruta y una tabla de modulos). Para guardar el archivo, usar 'Send and Download' en lugar de 'Send'."
+          }
+        },
+        {
+          "name": "Exportar reporte de un estudiante en PDF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con un PDF descargable', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+                  "    const disposicion = pm.response.headers.get('Content-Disposition');",
+                  "    pm.expect(disposicion).to.include('attachment');",
+                  "    pm.expect(disposicion).to.match(/reporte-progreso-estudiante-\\d+-\\d{4}-\\d{2}-\\d{2}\\.pdf/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso/exportar?formato=pdf&idUsuario={{idUsuarioEstudiante}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso",
+                "exportar"
+              ],
+              "query": [
+                {
+                  "key": "formato",
+                  "value": "pdf"
+                },
+                {
+                  "key": "idUsuario",
+                  "value": "{{idUsuarioEstudiante}}"
+                }
+              ]
+            },
+            "description": "RF-25, CU-16, DT-22: igual que la exportacion en PDF, limitada al estudiante indicado; el nombre del archivo incluye su id. Para guardar el archivo, usar 'Send and Download' en lugar de 'Send'."
+          }
         }
       ]
     },
@@ -1614,6 +1759,36 @@
               ]
             },
             "description": "RF-25 / DT-20: un idUsuario inexistente (o de un docente) responde UsuarioNoEncontradoError -> 404."
+          }
+        },
+        {
+          "name": "Exportar con formato invalido -> 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/progreso/exportar?formato=xlsx",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "progreso",
+                "exportar"
+              ],
+              "query": [
+                {
+                  "key": "formato",
+                  "value": "xlsx"
+                }
+              ]
+            },
+            "description": "RF-25 / DT-22: formato solo acepta csv o pdf; cualquier otro valor responde 400 con { error: 'Parametros de consulta invalidos' }."
           }
         },
         {

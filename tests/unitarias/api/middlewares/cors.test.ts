@@ -1,7 +1,7 @@
 // tests/unitarias/api/middlewares/cors.test.ts
 // Pruebas unitarias del middleware CORS: solo los origenes configurados reciben los
 // encabezados de acceso, y el preflight OPTIONS se responde sin llegar a las rutas.
-// Cubre: DT-07 (RNF-15)
+// Cubre: DT-07 (RNF-15), RF-25 — CU-16
 
 import { describe, it, expect } from "vitest";
 import express from "express";
@@ -69,6 +69,20 @@ describe("crearCors", () => {
     expect(respuesta.status).toBe(204);
     expect(respuesta.headers["access-control-allow-methods"]).toContain(
       "PATCH"
+    );
+  });
+
+  // RF-25, CU-16: sin este encabezado expuesto, el frontend (otro origen) no puede leer el
+  // nombre del archivo exportado (DT-22).
+  it("expone Content-Disposition para que el frontend lea el nombre de los archivos descargados", async () => {
+    const app = crearAppDePrueba(["http://localhost:5173"]);
+
+    const respuesta = await request(app)
+      .get("/recurso")
+      .set("Origin", "http://localhost:5173");
+
+    expect(respuesta.headers["access-control-expose-headers"]).toContain(
+      "Content-Disposition"
     );
   });
 });

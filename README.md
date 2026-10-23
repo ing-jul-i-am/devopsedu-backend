@@ -20,6 +20,7 @@ gestion de modulos y rutas de aprendizaje con validacion automatica de actividad
 | Validacion | Zod |
 | Seguridad | JWT (jsonwebtoken) y bcrypt con 12 rondas |
 | Logging | Pino |
+| Reportes en PDF | pdfkit |
 | Pruebas | Vitest y Supertest |
 
 ## Arquitectura
@@ -142,10 +143,11 @@ ejemplo con cuatro modulos.
 
 ## Estado
 
-Implementadas las etapas 0 a 6 del plan (identidad, servicios, despliegue y monitoreo,
-componente educativo). Pendiente la etapa 7: reportes y exportacion de resultados para el
-docente (`/api/reportes`, RF-25, CU-15, CU-16) y el endurecimiento final. El mapa de
-etapas esta en `CLAUDE.md`, seccion 11.
+Implementadas las etapas 0 a 7 del plan: identidad, servicios, despliegue y monitoreo,
+componente educativo, y reportes de progreso para el docente con exportacion en CSV o PDF
+(`/api/reportes` y `/api/usuarios/estudiantes`, RF-25, CU-15, CU-16). RNF-06, RNF-23 y
+RNF-24 quedaron postergados por decision del desarrollador. El mapa de etapas esta en
+`CLAUDE.md`, seccion 11.
 
 ## Documentacion
 

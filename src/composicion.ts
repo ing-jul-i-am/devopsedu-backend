@@ -16,6 +16,8 @@ import { ActividadRepo } from "./repositorios/actividad-repo.js";
 import { EvaluacionRepo } from "./repositorios/evaluacion-repo.js";
 import { ResultadoRepo } from "./repositorios/resultado-repo.js";
 import { Cifrador } from "./infraestructura/cifrador.js";
+import { ExportadorCsv } from "./infraestructura/exportador-csv.js";
+import { ExportadorPdf } from "./infraestructura/exportador-pdf.js";
 import { EmisorToken } from "./infraestructura/emisor-token.js";
 import {
   crearMedidorRecursos,
@@ -141,6 +143,8 @@ export function construirDependencias(
     actividadRepo,
     evaluacionRepo,
     resultadoRepo,
+    exportadorCsv: new ExportadorCsv(),
+    exportadorPdf: new ExportadorPdf(),
   });
   const gestorUsuarios = new GestorUsuarios({
     usuarioRepo,
