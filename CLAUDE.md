@@ -12,6 +12,7 @@ Este archivo orienta a Claude Code en el desarrollo del backend de la plataforma
 - **Autor:** Julian Andrés Barrera García — Universidad Mariano Gálvez de Guatemala
 - **Repositorio asociado:** Backend (`devopsedu-backend`). El frontend vive en `devopsedu-frontend`.
 - **Propósito:** Permitir a estudiantes desplegar y monitorear contenedores Docker desde una interfaz gráfica educativa, con verificación previa de recursos y registro de operaciones para análisis comparativo.
+- **Roles:** solo existen `estudiante` y `docente`. El perfil investigador que describe el diseño (sección 4.1.7.3) se descartó por decisión del desarrollador: la consulta y exportación de reportes (RF-25, CU-15, CU-16) es exclusiva del docente.
 
 El diseño formal se encuentra en `Diseño_tecnico_de_proyecto.pdf`. Cuando una decisión técnica no esté cubierta por este CLAUDE.md, consulta primero esa fuente.
 
@@ -24,7 +25,7 @@ El diseño formal se encuentra en `Diseño_tecnico_de_proyecto.pdf`. Cuando una 
 | Lenguaje | TypeScript | 5.x estricto |
 | Runtime | Node.js | 20 LTS |
 | Framework HTTP | Express.js | 4.x |
-| ORM | Prisma | 5.x |
+| ORM | Prisma | 6.x |
 | Base de datos | PostgreSQL | 16 |
 | Cliente Docker | Dockerode | última estable |
 | Validación | Zod | 3.x |
@@ -334,12 +335,12 @@ Prohibido construir literales de datos extensos dentro de los tests. Eso oscurec
 | Grupo | Endpoint base | RF | CU |
 | --- | --- | --- | --- |
 | Identidad | `/api/auth` | RF-01, RF-02, RF-03 | CU-01, CU-02 |
-| Usuarios | `/api/usuarios` | RF-01, RF-04 | — |
+| Usuarios | `/api/usuarios` | RF-01, RF-04, RF-25 | CU-15 |
 | Servicios | `/api/servicios` | RF-05 a RF-08, RF-11 a RF-15, RF-17 | CU-03, CU-05, CU-06, CU-07 |
 | Recursos | `/api/servidor/capacidad` | RF-09, RF-10 | CU-04 |
 | Monitoreo | `/api/metricas`, `/api/historico` | RF-16, RF-18, RF-19 | CU-08, CU-09 |
 | Aprendizaje (estudiante) | `/api/aprendizaje` | RF-22 a RF-24 | CU-12, CU-13, CU-14 |
-| Aprendizaje (docente) | `/api/modulos`, `/api/rutas`, `/api/reportes` | RF-20, RF-21, RF-25, RF-26 | CU-10, CU-11, CU-15, CU-16 |
+| Aprendizaje (docente) | `/api/modulos`, `/api/rutas`, `/api/reportes` | RF-20, RF-21, RF-25 | CU-10, CU-11, CU-15, CU-16 |
 
 Al crear un nuevo endpoint, registra en un comentario al inicio del controlador y de su archivo de pruebas los RF y CU que cubre.
 
@@ -412,9 +413,15 @@ Scripts esperados en `package.json`:
 | 4 | Gestión de servicios y verificación de recursos | RF-05 a RF-10 | Tests unitarios para VerificadorRecursos con dependencias mockeadas |
 | 5 | Despliegue, control, monitoreo | RF-11 a RF-19, RNF-08, RNF-09 | Tests unitarios mockeando Dockerode; integración con BD para registros |
 | 6 | Componente educativo | RF-20 a RF-24 | Tests para EvaluadorActividad y reglas de validación |
-| 7 | Reportes, exportación, endurecimiento | RF-25, RF-26, RNF-06, RNF-22 a RNF-25 | Tests de carga ligeros (RNF-24) |
+| 7 | Reportes y exportación (docente) | RF-25 (CU-15, CU-16) | Tests unitarios para el cálculo del reporte y los exportadores; integración para endpoints |
 
 No comiences una etapa sin que las pruebas de la etapa anterior estén en verde.
+
+Notas sobre la Etapa 7:
+
+- El catálogo de RF del diseño (v1.13) termina en RF-25; no existe un RF-26.
+- RNF-22 (disponibilidad durante las sesiones experimentales) y RNF-25 (operación dentro de los límites del servidor físico) se verifican durante las sesiones experimentales, no con código.
+- RNF-06 (tiempo de respuesta), RNF-23 (recuperación tras interrupciones) y RNF-24 (usuarios concurrentes) quedan postergados indefinidamente por decisión del desarrollador. No se implementan pruebas de carga.
 
 ---
 

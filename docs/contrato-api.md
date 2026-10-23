@@ -63,7 +63,7 @@ base de datos y resincroniza automaticamente (ver 3.6):
 El resto del documento no ha sido re-auditado desde el commit base.
 
 Este documento describe **unicamente los endpoints ya implementados**. El
-`/api/reportes` (docente, RF-25, RF-26) todavia no existe en el backend y no
+`/api/reportes` (docente, RF-25) todavia no existe en el backend y no
 debe asumirse disponible por el frontend. Cuando se implemente, este
 documento se actualizara.
 
@@ -1225,7 +1225,7 @@ No implementado aun en el backend (no invocar desde el frontend todavia):
   el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
 - Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
   DT-08 para la relacion con el reseteo administrativo actual).
-- `/api/reportes` (docente, RF-25, RF-26, CU-15, CU-16). Con RF-24 (ver
+- `/api/reportes` (docente, RF-25, CU-15, CU-16). Con RF-24 (ver
   seccion 6.3) la Etapa 6 queda completa; `/api/reportes` es lo unico
   pendiente de la Etapa 7.
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
