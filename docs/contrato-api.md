@@ -63,6 +63,9 @@ base de datos y resincroniza automaticamente (ver 3.6):
   usuario en el mismo segundo ya no responden `500`. La forma de la respuesta no cambia.
 - Etapa 7 (RF-25, CU-15, DT-20): se agrega el grupo `/api/reportes`, exclusivo del
   rol docente, con `GET /api/reportes/progreso`. Ver seccion 8b.
+- Etapa 7 (RF-25, CU-15, DT-21): se agrega `GET /api/usuarios/estudiantes` (docente) con
+  el listado de estudiantes y un resumen de su ruta (7.2). El reporte de 8b.1 agrega
+  `fechaRegistro` a cada estudiante.
 
 El resto del documento no ha sido re-auditado desde el commit base.
 
@@ -1110,7 +1113,8 @@ evaluacion se bloquea para nuevos intentos. `intentosRestantes` cuenta contra
 ## 7. Usuarios — `/api/usuarios`
 
 Recurso agregado por DT-08, fuera del catalogo formal de RF (no hay un RF de
-reseteo administrativo de contrasena). Todas las rutas requieren autenticacion
+reseteo administrativo de contrasena), y ampliado con el listado de estudiantes de RF-25
+(DT-21). Todas las rutas requieren autenticacion
 y estan restringidas al rol `docente` (`autorizar("docente")`); un estudiante
 recibe `403`. Reutiliza el mecanismo transversal de RF-04.
 
@@ -1140,6 +1144,46 @@ el contexto y las limitaciones aceptadas).
 | `400` | Cuerpo invalido: falta `contrasenaNueva` o es una cadena vacia (ver 1.4) |
 | `401` / `403` | Igual que el resto del grupo |
 | `404` | `UsuarioNoEncontradoError` — no existe un usuario con ese id |
+
+### 7.2 `GET /api/usuarios/estudiantes`
+
+Cubre RF-25 — CU-15 (DT-21). Lista los usuarios con rol `estudiante`, ordenados por
+`nombre` (y por `idUsuario` entre homonimos), con un resumen de su ruta vigente. Sirve
+para elegir el `idUsuario` al asignar una ruta (5.1), resetear una contrasena (7.1) o
+pedir el reporte de un estudiante (8b.1). Nunca incluye la contrasena cifrada.
+
+**Response `200 OK`** (sin estudiantes registrados, `[]`)
+
+```json
+[
+  {
+    "idUsuario": 3,
+    "nombre": "Beatriz Estudiante",
+    "correo": "beatriz@devopsedu.local",
+    "fechaRegistro": "2026-01-20T15:00:00.000Z",
+    "ruta": null
+  },
+  {
+    "idUsuario": 2,
+    "nombre": "Luis Estudiante",
+    "correo": "luis@devopsedu.local",
+    "fechaRegistro": "2026-01-15T15:00:00.000Z",
+    "ruta": {
+      "idRuta": 1,
+      "fechaAsignacion": "2026-02-01T10:00:00.000Z",
+      "progreso": 50,
+      "totalModulos": 2,
+      "modulosCompletados": 1
+    }
+  }
+]
+```
+
+`ruta` resume la misma ruta que devuelve el reporte de progreso (8b.1) y sale del mismo
+calculo: `progreso` y `modulosCompletados` coinciden con los de ese reporte y con los de
+`mi-ruta` (6.1). Para el detalle por modulo, actividad y evaluacion, usar 8b.1.
+
+**Errores posibles**: `401` / `403`, igual que el resto del grupo.
 
 ---
 
@@ -1198,12 +1242,14 @@ Sin estudiantes registrados, `[]`.
     "idUsuario": 3,
     "nombre": "Beatriz Estudiante",
     "correo": "beatriz@devopsedu.local",
+    "fechaRegistro": "2026-01-20T15:00:00.000Z",
     "ruta": null
   },
   {
     "idUsuario": 2,
     "nombre": "Luis Estudiante",
     "correo": "luis@devopsedu.local",
+    "fechaRegistro": "2026-01-15T15:00:00.000Z",
     "ruta": {
       "idRuta": 1,
       "fechaAsignacion": "2026-02-01T10:00:00.000Z",
@@ -1316,9 +1362,9 @@ No implementado aun en el backend (no invocar desde el frontend todavia):
   el reseteo administrativo de contrasena por el docente (DT-08, ver seccion 7).
 - Flujo de autoservicio "olvide mi contrasena" (sin RF asignado en el catalogo; ver
   DT-08 para la relacion con el reseteo administrativo actual).
-- Exportacion del reporte de progreso en CSV o PDF (docente, RF-25, CU-16) y listado
-  de estudiantes (`GET /api/usuarios/estudiantes`). Son lo unico pendiente de la
-  Etapa 7; la consulta del reporte ya existe (8b.1).
+- Exportacion del reporte de progreso en CSV o PDF (docente, RF-25, CU-16). Es lo unico
+  pendiente de la Etapa 7; la consulta del reporte (8b.1) y el listado de estudiantes
+  (7.2) ya existen.
 - WebSockets o *polling* de metricas en vivo: por ahora `GET
   /api/servicios/:id/metricas` solo expone el historico persistido por
   `MonitorPeriodico` (RF-16, RF-18, RF-19); no hay endpoint de "metrica actual" fuera

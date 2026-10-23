@@ -1267,6 +1267,50 @@
       "name": "Usuarios",
       "item": [
         {
+          "name": "Listar estudiantes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con los estudiantes y sin contrasenas', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const datos = pm.response.json();",
+                  "    pm.expect(datos).to.be.an('array');",
+                  "    datos.forEach((estudiante) => pm.expect(estudiante).to.not.have.property('contrasenaCifrada'));",
+                  "    // Si el login del estudiante aun no guardo su id, lo toma del listado por correo.",
+                  "    const propio = datos.find((estudiante) => estudiante.correo === pm.environment.get('correoEstudiante'));",
+                  "    if (propio && !pm.environment.get('idUsuarioEstudiante')) {",
+                  "        pm.environment.set('idUsuarioEstudiante', propio.idUsuario);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenDocente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/estudiantes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "estudiantes"
+              ]
+            },
+            "description": "RF-25, CU-15, DT-21: listado de estudiantes para el docente, ordenado por nombre, con id, nombre, correo, fecha de registro y un resumen de su ruta vigente (progreso y modulos completados, o null si no tiene ruta). El resumen sale del mismo calculo que el reporte de progreso. Sirve para obtener el idUsuario que piden 'Asignar ruta', 'Resetear contrasena' y el reporte de un estudiante."
+          }
+        },
+        {
           "name": "Resetear contrasena de estudiante",
           "event": [
             {
@@ -1570,6 +1614,29 @@
               ]
             },
             "description": "RF-25 / DT-20: un idUsuario inexistente (o de un docente) responde UsuarioNoEncontradoError -> 404."
+          }
+        },
+        {
+          "name": "Listar estudiantes como estudiante -> 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenEstudiante}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/estudiantes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "estudiantes"
+              ]
+            },
+            "description": "RF-25 / DT-21: el listado de estudiantes es exclusivo del docente; autorizar('docente') rechaza con PermisoDenegadoError -> 403."
           }
         },
         {

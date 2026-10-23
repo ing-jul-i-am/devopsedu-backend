@@ -114,12 +114,14 @@ describe("GET /api/reportes/progreso", () => {
         idUsuario: beatriz.idUsuario,
         nombre: "Beatriz Estudiante",
         correo: beatriz.correo,
+        fechaRegistro: beatriz.fechaRegistro.toISOString(),
         ruta: null,
       },
       {
         idUsuario: luis.idUsuario,
         nombre: ESTUDIANTE.nombre,
         correo: ESTUDIANTE.correo,
+        fechaRegistro: luis.fechaRegistro.toISOString(),
         ruta: {
           idRuta: ruta.idRuta,
           fechaAsignacion: ruta.fechaAsignacion.toISOString(),

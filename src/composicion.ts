@@ -135,13 +135,17 @@ export function construirDependencias(
     calculadorProgreso,
     actividadRepo,
   });
-  const gestorUsuarios = new GestorUsuarios({ usuarioRepo, cifrador });
   const gestorReportes = new GestorReportes({
     usuarioRepo,
     rutaRepo: rutaAprendizajeRepo,
     actividadRepo,
     evaluacionRepo,
     resultadoRepo,
+  });
+  const gestorUsuarios = new GestorUsuarios({
+    usuarioRepo,
+    cifrador,
+    gestorReportes,
   });
 
   const autenticar = crearAutenticar({ emisor, sesionRepo, usuarioRepo });

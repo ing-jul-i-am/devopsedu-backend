@@ -973,3 +973,41 @@ resultado por actividad (DT-13), asi que coincide con el conteo de `CalculadorPr
 - Reportar todas las notas de cada intento. Descartada por el desarrollador: la mejor nota mas
   los intentos basta, y una fila por intento duplicaria las filas de la exportacion.
 - Un rol `investigador` con acceso de solo lectura. Descartado por el desarrollador.
+
+---
+
+## DT-21: listado de estudiantes del docente en /api/usuarios, calculado con el reporte (RF-25)
+
+**Fecha:** 2026-10-23
+
+**Contexto:** El docente no tenia forma de ver que estudiantes existen ni sus ids, que necesita
+para asignar rutas (`POST /api/rutas`), resetear contrasenas (DT-08) o pedir el reporte de un
+estudiante (DT-20). El desarrollador pidio un listado con los datos basicos de cada estudiante y
+un resumen ligero de su ruta.
+
+**Decision:**
+
+1. **Ubicacion:** `GET /api/usuarios/estudiantes`, exclusivo del docente. Se agrupa con las demas
+   operaciones administrativas sobre usuarios y no con `/api/reportes`, porque es el punto de
+   partida para elegir un estudiante y no un reporte. Se registra antes de `/:id/contrasena`.
+2. **Contenido:** `idUsuario`, `nombre`, `correo`, `fechaRegistro` y `ruta`: `null`, o
+   `{ idRuta, fechaAsignacion, progreso, totalModulos, modulosCompletados }`. Nunca incluye la
+   contrasena cifrada: cada elemento se arma campo por campo.
+3. **Mismo calculo que el reporte:** `GestorUsuarios.listarEstudiantes` reutiliza
+   `GestorReportes.generarProgreso` y lo resume con la funcion pura `resumirRuta`. No lee la
+   columna `ruta_aprendizaje.progreso`, que puede estar desfasada (DT-20), asi que el listado,
+   el reporte y `mi-ruta` muestran el mismo progreso.
+4. **`fechaRegistro` en el reporte:** para que el listado no vuelva a consultar a los
+   estudiantes, el reporte de progreso (8b.1 del contrato) agrega `fechaRegistro` a cada
+   estudiante. Es un campo nuevo, compatible con los consumidores existentes.
+
+**Consecuencias:** El listado cuesta lo mismo que el reporte completo (cinco consultas fijas)
+aunque solo muestre un resumen. Para el tamano de grupo del prototipo es aceptable, y a cambio no
+hay un segundo calculo de progreso que mantener.
+
+**Alternativas consideradas:**
+- Leer el progreso persistido en `ruta_aprendizaje.progreso`. Descartada: puede no coincidir con
+  el reporte ni con `mi-ruta`.
+- Ubicarlo en `/api/reportes/estudiantes`. Descartada: el listado sirve para operar sobre
+  usuarios (asignar rutas, resetear contrasenas), no solo para consultar resultados.
+- Solo datos basicos, sin resumen de ruta. Descartada por el desarrollador.

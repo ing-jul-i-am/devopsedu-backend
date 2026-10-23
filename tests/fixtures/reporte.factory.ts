@@ -67,6 +67,7 @@ export function entradaReporteEstudiante(
       idUsuario: 1,
       nombre: "Ana Estudiante",
       correo: "ana@devopsedu.local",
+      fechaRegistro: new Date("2026-01-15"),
     },
     ruta: {
       idRuta: 1,

@@ -74,6 +74,7 @@ export class GestorReportes {
           idUsuario: estudiante.idUsuario,
           nombre: estudiante.nombre,
           correo: estudiante.correo,
+          fechaRegistro: estudiante.fechaRegistro,
         },
         ruta: rutas.get(estudiante.idUsuario) ?? null,
         actividades,

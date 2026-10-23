@@ -42,7 +42,12 @@ export interface ResultadoEntradaReporte {
 // actividades y evaluaciones pueden incluir las de modulos ajenos a la ruta del estudiante (el
 // servicio las carga una sola vez para todos); resultados son solo los del estudiante.
 export interface EntradaReporteEstudiante {
-  usuario: { idUsuario: number; nombre: string; correo: string };
+  usuario: {
+    idUsuario: number;
+    nombre: string;
+    correo: string;
+    fechaRegistro: Date;
+  };
   ruta: {
     idRuta: number;
     fechaAsignacion: Date;
@@ -93,7 +98,16 @@ export interface ReporteEstudiante {
   idUsuario: number;
   nombre: string;
   correo: string;
+  fechaRegistro: Date;
   ruta: ReporteRuta | null;
+}
+
+export interface ResumenRuta {
+  idRuta: number;
+  fechaAsignacion: Date;
+  progreso: number;
+  totalModulos: number;
+  modulosCompletados: number;
 }
 
 // RF-24, DT-11: se reporta la mejor nota porque es la que decide la aprobacion; el umbral y el
@@ -180,6 +194,22 @@ function construirReporteModulo(
     fechaInicio: rutaModulo.fechaInicio,
     actividades: { completadas, total: detalle.length, detalle },
     evaluacion: resumenEvaluacion,
+  };
+}
+
+// RF-25: resumen ligero de la ruta para el listado de estudiantes del docente (CU-15).
+export function resumirRuta(ruta: ReporteRuta | null): ResumenRuta | null {
+  if (!ruta) {
+    return null;
+  }
+  return {
+    idRuta: ruta.idRuta,
+    fechaAsignacion: ruta.fechaAsignacion,
+    progreso: ruta.progreso,
+    totalModulos: ruta.modulos.length,
+    modulosCompletados: ruta.modulos.filter(
+      (modulo) => modulo.estado === "completado"
+    ).length,
   };
 }
 

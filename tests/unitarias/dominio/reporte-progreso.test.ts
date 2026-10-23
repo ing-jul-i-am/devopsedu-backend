@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   construirReporteEstudiante,
   resumirEvaluacion,
+  resumirRuta,
 } from "@/dominio/reporte-progreso.js";
 import {
   actividadDeReporte,
@@ -72,6 +73,7 @@ describe("construirReporteEstudiante", () => {
       idUsuario: 1,
       nombre: "Ana Estudiante",
       correo: "ana@devopsedu.local",
+      fechaRegistro: new Date("2026-01-15"),
       ruta: null,
     });
   });
@@ -204,5 +206,44 @@ describe("construirReporteEstudiante", () => {
     expect(modulo?.actividades.total).toBe(0);
     expect(modulo?.evaluacion).toBeNull();
     expect(modulo?.estado).toBe("completado");
+  });
+});
+
+// RF-25: resumen ligero de la ruta para el listado de estudiantes del docente (CU-15).
+describe("resumirRuta", () => {
+  it("cuenta los modulos completados sobre el total de la ruta", () => {
+    // Arrange
+    const reporte = construirReporteEstudiante(
+      entradaReporteEstudiante({
+        ruta: {
+          idRuta: 3,
+          fechaAsignacion: new Date("2026-02-01"),
+          rutaModulos: [
+            rutaModuloDeReporte({ idModulo: 1 }),
+            rutaModuloDeReporte({ idModulo: 2, fechaInicio: null }),
+          ],
+        },
+      })
+    );
+
+    // Act
+    const resumen = resumirRuta(reporte.ruta);
+
+    // Assert
+    expect(resumen).toEqual({
+      idRuta: 3,
+      fechaAsignacion: new Date("2026-02-01"),
+      progreso: 50,
+      totalModulos: 2,
+      modulosCompletados: 1,
+    });
+  });
+
+  it("devuelve null cuando el estudiante no tiene ruta", () => {
+    // Act
+    const resumen = resumirRuta(null);
+
+    // Assert
+    expect(resumen).toBeNull();
   });
 });

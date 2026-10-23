@@ -1,6 +1,6 @@
 // src/api/controladores/usuarios/usuarios.controlador.ts
 // Controladores HTTP administrativos sobre usuarios, exclusivos del rol docente.
-// Cubre: RF-04
+// Cubre: RF-04, RF-25 — CU-15
 
 import type { RequestHandler, Request } from "express";
 import type { GestorUsuarios } from "../../../servicios-aplicacion/gestor-usuarios.js";
@@ -16,6 +16,7 @@ function idUsuarioDe(req: Request): number {
 
 export function crearControladoresUsuarios(gestorUsuarios: GestorUsuarios): {
   resetearContrasena: RequestHandler;
+  listarEstudiantes: RequestHandler;
 } {
   const resetearContrasena: RequestHandler = async (req, res, next) => {
     try {
@@ -30,5 +31,15 @@ export function crearControladoresUsuarios(gestorUsuarios: GestorUsuarios): {
     }
   };
 
-  return { resetearContrasena };
+  // RF-25: el servicio arma cada elemento campo por campo, por lo que la contrasena cifrada
+  // nunca llega a la respuesta.
+  const listarEstudiantes: RequestHandler = async (_req, res, next) => {
+    try {
+      res.status(200).json(await gestorUsuarios.listarEstudiantes());
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  return { resetearContrasena, listarEstudiantes };
 }

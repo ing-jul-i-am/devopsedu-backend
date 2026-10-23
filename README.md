@@ -127,7 +127,7 @@ Umbrales de cobertura: 80% en lineas, funciones y declaraciones, y 75% en ramas.
 | Grupo | Ruta base | Requerimientos |
 | --- | --- | --- |
 | Identidad | `/api/auth` | RF-01, RF-02, RF-03 |
-| Usuarios | `/api/usuarios` | RF-04 |
+| Usuarios | `/api/usuarios` | RF-04, RF-25 |
 | Servicios y monitoreo | `/api/servicios` | RF-05 a RF-08, RF-11 a RF-19 |
 | Recursos del servidor | `/api/servidor/capacidad` | RF-09, RF-10 |
 | Modulos (docente) | `/api/modulos` | RF-20, RF-23, RF-24 |
